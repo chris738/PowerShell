@@ -71,7 +71,7 @@ foreach ($user in $users) {
             -Enabled $true
 
         $cleanMessage = Remove-EmojiFromString -InputString "Benutzer $display erfolgreich angelegt: $sam in $ouPath"
-        Write-Host $cleanMessage -ForegroundColor Green
+        Write-Host $cleanMessage -ForegroundColor White
     }
     catch {
         if ($_.Exception.Message -like "*already exists*" -or $_.Exception.Message -like "*bereits vorhanden*") {
