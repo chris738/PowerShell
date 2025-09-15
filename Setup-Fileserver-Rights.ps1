@@ -36,13 +36,13 @@ $base = "F:\Shares"
 $domain = (Get-ADDomain)
 $dcPath = "DC=$($domain.DNSRoot.Replace('.',',DC='))"
 
-# "Domain Admins" SID sicher auflösen
+# "Domain Admins" / "Domänen-Admins" SID sicher auflösen (unterstützt deutsche und englische Server)
 try {
     $adminSid = Get-SafeDomainAdminsIdentity
-    Write-Host "Domain Admins SID erfolgreich aufgelöst"
+    Write-Host "Domain Admins SID erfolgreich aufgelöst (Domänen-Admins/Domain Admins)"
 }
 catch {
-    Write-ErrorMessage -Message "Kritischer Fehler: Konnte Domain Admins SID nicht auflösen" -Type "Error"
+    Write-ErrorMessage -Message "Kritischer Fehler: Konnte Domain Admins SID nicht auflösen (Domänen-Admins/Domain Admins)" -Type "Error"
     exit 1
 }
 

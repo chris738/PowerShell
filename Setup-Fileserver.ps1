@@ -35,13 +35,13 @@ $base = "F:\Shares"
 # OU für Gruppen
 $ou = "OU=Gruppen,DC=eHH,DC=de"
 
-# Admin-Gruppe mit sicherer Identitätserkennung
+# Admin-Gruppe mit sicherer Identitätserkennung (unterstützt deutsche und englische Server)
 try {
     $adminIdentity = Get-SafeDomainAdminsIdentity
-    Write-Host "Domain Admins Identität erfolgreich aufgelöst"
+    Write-Host "Domain Admins Identität erfolgreich aufgelöst (Domänen-Admins/Domain Admins)"
 }
 catch {
-    Write-ErrorMessage -Message "Kritischer Fehler: Konnte Domain Admins Identität nicht auflösen" -Type "Error"
+    Write-ErrorMessage -Message "Kritischer Fehler: Konnte Domain Admins Identität nicht auflösen (Domänen-Admins/Domain Admins)" -Type "Error"
     exit 1
 }
 

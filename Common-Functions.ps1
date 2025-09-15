@@ -238,20 +238,37 @@ function Get-SafeDomainAdminsIdentity {
     <#
     .SYNOPSIS
     Ruft die Domain Admins Gruppe sicher ab und gibt eine verwendbare Identität zurück
+    Unterstützt sowohl deutsche ("Domänen-Admins") als auch englische ("Domain Admins") Serverumgebungen
     
     .RETURNS
     SecurityIdentifier-Objekt für Domain Admins
     #>
     try {
-        # Versuche zuerst über den direkten Namen
-        $domainAdmins = Get-ADGroup -Identity "Domain Admins" -ErrorAction SilentlyContinue
+        # Versuche zuerst die deutsche Bezeichnung für deutsche Server
+        $domainAdmins = Get-ADGroup -Identity "Domänen-Admins" -ErrorAction SilentlyContinue
         if ($domainAdmins) {
+            Write-Host "Deutsche Domain Admins Gruppe 'Domänen-Admins' gefunden" -ForegroundColor Green
             return New-Object System.Security.Principal.SecurityIdentifier $domainAdmins.SID
         }
         
-        # Fallback: Suche über Filter
+        # Fallback: Englische Bezeichnung für internationale Server
+        $domainAdmins = Get-ADGroup -Identity "Domain Admins" -ErrorAction SilentlyContinue
+        if ($domainAdmins) {
+            Write-Host "Englische Domain Admins Gruppe 'Domain Admins' gefunden" -ForegroundColor Green
+            return New-Object System.Security.Principal.SecurityIdentifier $domainAdmins.SID
+        }
+        
+        # Fallback: Suche über Filter (deutsch)
+        $domainAdmins = Get-ADGroup -Filter {Name -eq "Domänen-Admins"} -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($domainAdmins) {
+            Write-Host "Deutsche Domain Admins Gruppe über Filter gefunden" -ForegroundColor Green
+            return New-Object System.Security.Principal.SecurityIdentifier $domainAdmins.SID
+        }
+        
+        # Fallback: Suche über Filter (englisch)
         $domainAdmins = Get-ADGroup -Filter {Name -eq "Domain Admins"} -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($domainAdmins) {
+            Write-Host "Englische Domain Admins Gruppe über Filter gefunden" -ForegroundColor Green
             return New-Object System.Security.Principal.SecurityIdentifier $domainAdmins.SID
         }
         
@@ -259,10 +276,11 @@ function Get-SafeDomainAdminsIdentity {
         $domain = Get-ADDomain
         $domainSid = $domain.DomainSID
         $domainAdminsSid = "$domainSid-512"  # Domain Admins haben immer RID 512
+        Write-Host "Domain Admins über bekannte SID aufgelöst" -ForegroundColor Yellow
         return New-Object System.Security.Principal.SecurityIdentifier $domainAdminsSid
     }
     catch {
-        Write-ErrorMessage -Message "Fehler beim Abrufen der Domain Admins Gruppe: $_" -Type "Error"
+        Write-ErrorMessage -Message "Fehler beim Abrufen der Domain Admins Gruppe (Domänen-Admins/Domain Admins): $_" -Type "Error"
         throw
     }
 }
