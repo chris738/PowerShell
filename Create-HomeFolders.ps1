@@ -60,16 +60,16 @@ foreach ($ou in $ous) {
         if (-not (Test-Path $userFolder)) {
             try {
                 New-Item -ItemType Directory -Path $userFolder -Force -ErrorAction Stop | Out-Null
-                Write-Host "📂 Ordner erstellt: $userFolder"
+                Write-Host "Ordner erstellt: $userFolder"
             }
             catch {
-                Write-Warning "⚠️ Konnte $userFolder nicht erstellen: $_"
+                Write-Warning "Konnte $userFolder nicht erstellen: $_"
                 continue
             }
         }
 
         if (-not (Test-Path $userFolder)) {
-            Write-Warning "⚠️ Ordner fehlt weiterhin: $userFolder"
+            Write-Warning "Ordner fehlt weiterhin: $userFolder"
             continue
         }
 
@@ -85,10 +85,10 @@ foreach ($ou in $ous) {
 			$acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($uSid,"Modify","ContainerInherit,ObjectInherit","None","Allow")))
 
 			Set-Acl -Path $userFolder -AclObject $acl
-			Write-Host "✔ NTFS für $folderName gesetzt."
+			Write-Host "NTFS für $folderName gesetzt."
 		}
 		catch {
-			Write-Warning "⚠️ ACL-Fehler bei ${userFolder}: $_"
+			Write-Warning "ACL-Fehler bei ${userFolder}: $_"
 			continue
 		}
 
@@ -96,10 +96,43 @@ foreach ($ou in $ous) {
         # Home-Laufwerk eintragen
         try {
             Set-ADUser $u -HomeDirectory $uncPath -HomeDrive "H:"
-            Write-Host "✔ $($u.SamAccountName): HomeDrive=H: ($uncPath)"
+            Write-Host "$($u.SamAccountName): HomeDrive=H: ($uncPath)"
         }
         catch {
-            Write-Warning "⚠️ Konnte HomeDrive für $($u.SamAccountName) nicht setzen: $_"
+            Write-Warning "Konnte HomeDrive für $($u.SamAccountName) nicht setzen: $_"
+        }
+
+        # Zusätzliche Laufwerkszuordnungen über ScriptPath setzen
+        try {
+            # Global-Laufwerk G: und Abteilungs-Laufwerk S: über Logon-Script
+            $globalPath = "\\$server\Global$"
+            $departmentPath = "\\$server\Abteilungen$\$ou"
+            
+            # Logon-Script erstellen für Laufwerkszuordnungen
+            $scriptContent = @"
+@echo off
+net use G: "$globalPath" /persistent:yes >nul 2>&1
+net use S: "$departmentPath" /persistent:yes >nul 2>&1
+"@
+            
+            # Script-Verzeichnis sicherstellen
+            $scriptDir = "F:\Shares\Scripts"
+            if (-not (Test-Path $scriptDir)) {
+                New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
+            }
+            
+            # Benutzer-spezifisches Logon-Script erstellen
+            $scriptFileName = "$($u.SamAccountName)_logon.bat"
+            $scriptFilePath = Join-Path $scriptDir $scriptFileName
+            $scriptContent | Out-File -FilePath $scriptFilePath -Encoding ASCII -Force
+            
+            # Script-Pfad im AD-Benutzer setzen
+            Set-ADUser $u -ScriptPath $scriptFileName
+            
+            Write-Host "$($u.SamAccountName): Laufwerkszuordnungen gesetzt - G: ($globalPath), S: ($departmentPath)"
+        }
+        catch {
+            Write-Warning "Konnte Laufwerkszuordnungen für $($u.SamAccountName) nicht setzen: $_"
         }
     }
 }

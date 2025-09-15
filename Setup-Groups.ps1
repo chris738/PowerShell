@@ -36,7 +36,7 @@ foreach ($dep in $departments) {
     $ggGroup = "GG_${dep}-MA"
     if (-not (Get-ADGroup -Filter {Name -eq $ggGroup} -SearchBase $ouPath -ErrorAction SilentlyContinue)) {
         New-ADGroup -Name $ggGroup -GroupScope Global -GroupCategory Security -Path $ouPath -Description "Globale Gruppe Mitarbeiter $dep"
-        Write-Host "👥 Gruppe erstellt: $ggGroup in $dep"
+        Write-Host "Gruppe erstellt: $ggGroup in $dep"
     }
 
     # Domain Local Gruppen (FS-Rechte) - RW und R
@@ -47,7 +47,7 @@ foreach ($dep in $departments) {
         if (-not (Get-ADGroup -Filter {Name -eq $dlGroup} -SearchBase $ouPath -ErrorAction SilentlyContinue)) {
             $description = if ($dlGroup -like "*_RW") { "Domain Local Gruppe FS RW $dep" } else { "Domain Local Gruppe FS R $dep" }
             New-ADGroup -Name $dlGroup -GroupScope DomainLocal -GroupCategory Security -Path $ouPath -Description $description
-            Write-Host "👥 Gruppe erstellt: $dlGroup in $dep"
+            Write-Host "Gruppe erstellt: $dlGroup in $dep"
         }
     }
 
@@ -55,10 +55,10 @@ foreach ($dep in $departments) {
     foreach ($dlGroup in @($dlGroupRW, $dlGroupR)) {
         try {
             Add-ADGroupMember -Identity $dlGroup -Members $ggGroup -ErrorAction Stop
-            Write-Host "🔗 $ggGroup → $dlGroup"
+            Write-Host "$ggGroup → $dlGroup"
         }
         catch {
-            Write-Host "⚠️ $ggGroup konnte nicht in $dlGroup eingefügt werden ($_)" -ForegroundColor Yellow
+            Write-Host "$ggGroup konnte nicht in $dlGroup eingefügt werden ($_)" -ForegroundColor Yellow
         }
     }
 }

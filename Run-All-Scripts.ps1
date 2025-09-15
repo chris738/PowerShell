@@ -28,7 +28,7 @@ if (-not $CsvFile) {
     $CsvFile = Get-DefaultCsvPath
 }
 
-Write-Host "🚀 Starte Ausführung aller Skripte mit CSV: $CsvFile" -ForegroundColor Cyan
+Write-Host "Starte Ausführung aller Skripte mit CSV: $CsvFile" -ForegroundColor Cyan
 
 # CSV validieren
 if (-not (Test-CsvFile -CsvPath $CsvFile)) {
@@ -36,7 +36,7 @@ if (-not (Test-CsvFile -CsvPath $CsvFile)) {
 }
 
 $departments = Get-DepartmentsFromCSV -CsvPath $CsvFile
-Write-Host "📋 Verarbeite Abteilungen: $($departments -join ', ')" -ForegroundColor Yellow
+Write-Host "Verarbeite Abteilungen: $($departments -join ', ')" -ForegroundColor Yellow
 
 # Skripte in der richtigen Reihenfolge ausführen
 $scripts = @(
@@ -50,25 +50,25 @@ $scripts = @(
 
 foreach ($script in $scripts) {
     if ($script.Skip) {
-        Write-Host "⏭️ Überspringe: $($script.Description)" -ForegroundColor Gray
+        Write-Host "Überspringe: $($script.Description)" -ForegroundColor Gray
         continue
     }
     
     $scriptPath = Join-Path $scriptDir $script.Name
     if (Test-Path $scriptPath) {
-        Write-Host "▶️ Führe aus: $($script.Description) ($($script.Name))" -ForegroundColor Green
+        Write-Host "Führe aus: $($script.Description) ($($script.Name))" -ForegroundColor Green
         try {
             & $scriptPath -CsvFile $CsvFile
-            Write-Host "✅ Abgeschlossen: $($script.Name)" -ForegroundColor Green
+            Write-Host "Abgeschlossen: $($script.Name)" -ForegroundColor Green
         }
         catch {
-            Write-Host "❌ Fehler in $($script.Name): $_" -ForegroundColor Red
+            Write-Host "Fehler in $($script.Name): $_" -ForegroundColor Red
         }
         Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
     }
     else {
-        Write-Host "⚠️ Skript nicht gefunden: $scriptPath" -ForegroundColor Yellow
+        Write-Host "Skript nicht gefunden: $scriptPath" -ForegroundColor Yellow
     }
 }
 
-Write-Host "🎉 Alle Skripte abgeschlossen!" -ForegroundColor Cyan
+Write-Host "Alle Skripte abgeschlossen!" -ForegroundColor Cyan

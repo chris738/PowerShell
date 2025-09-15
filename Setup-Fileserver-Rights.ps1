@@ -35,14 +35,14 @@ $base = "F:\Shares"
 # "Domain Admins" SID automatisch auflösen
 $domainAdmins = Get-ADGroup "Domain Admins"
 $adminSid = New-Object System.Security.Principal.SecurityIdentifier $domainAdmins.SID
-Write-Host "✅ Verwende Admin-SID: $($domainAdmins.SID)"
+Write-Host "Verwende Admin-SID: $($domainAdmins.SID)"
 
 # Funktion: Ordner anlegen
 function Ensure-Folder {
     param([string]$path)
     if (-Not (Test-Path $path)) {
         New-Item -Path $path -ItemType Directory -Force | Out-Null
-        Write-Host "📂 Ordner erstellt: $path"
+        Write-Host "Ordner erstellt: $path"
     }
 }
 
@@ -70,7 +70,7 @@ function Set-Permissions {
     }
 
     Set-Acl -Path $path -AclObject $acl
-    Write-Host "✅ Rechte gesetzt auf $path"
+    Write-Host "Rechte gesetzt auf $path"
 }
 
 # --- Abteilungen ---
@@ -90,7 +90,7 @@ foreach ($dep in $departments) {
     foreach ($grp in @($dlGroupRW, $dlGroupR)) {
         if (-not (Get-ADGroup -Filter {Name -eq $grp} -ErrorAction SilentlyContinue)) {
             New-ADGroup -Name $grp -GroupScope DomainLocal -GroupCategory Security -Path "OU=$dep,DC=eHH,DC=de" -Description "DL Gruppe für $dep Fileshare"
-            Write-Host "👥 Gruppe erstellt: $grp"
+            Write-Host "Gruppe erstellt: $grp"
         }
     }
 
@@ -107,7 +107,7 @@ $dlGlobalR  = "DL_Global-FS_R"
 foreach ($grp in @($dlGlobalRW, $dlGlobalR)) {
     if (-not (Get-ADGroup -Filter {Name -eq $grp} -ErrorAction SilentlyContinue)) {
         New-ADGroup -Name $grp -GroupScope DomainLocal -GroupCategory Security -Path "OU=Verwaltung,DC=eHH,DC=de" -Description "DL Gruppe für Global Fileshare"
-        Write-Host "👥 Gruppe erstellt: $grp"
+        Write-Host "Gruppe erstellt: $grp"
     }
 }
 Set-Permissions -path $globalFolder -groupRW $dlGlobalRW -groupR $dlGlobalR
@@ -122,5 +122,23 @@ $acl.SetAccessRuleProtection($true, $false)
 $ruleAdmins = New-Object System.Security.AccessControl.FileSystemAccessRule($adminSid,"FullControl","ContainerInherit,ObjectInherit","None","Allow")
 $acl.SetAccessRule($ruleAdmins)
 Set-Acl -Path $homeFolder -AclObject $acl
-Write-Host "✅ Rechte für Home-Root: nur Admins"
-Write-Host "ℹ️ Benutzerrechte für einzelne Home-Ordner werden separat pro User vergeben."
+Write-Host "Rechte für Home-Root: nur Admins"
+Write-Host "Benutzerrechte für einzelne Home-Ordner werden separat pro User vergeben."
+
+# --- Scripts ---
+$scriptsFolder = "$base\Scripts"
+Ensure-Folder $scriptsFolder
+
+# Rechte: Admins Vollzugriff, alle Benutzer Lesen+Ausführen
+$acl = Get-Acl $scriptsFolder
+$acl.SetAccessRuleProtection($true, $false)
+$ruleAdmins = New-Object System.Security.AccessControl.FileSystemAccessRule($adminSid,"FullControl","ContainerInherit,ObjectInherit","None","Allow")
+$acl.SetAccessRule($ruleAdmins)
+
+# Authenticated Users: Lesen und Ausführen für Logon-Scripts
+$authenticatedUsers = New-Object System.Security.Principal.SecurityIdentifier "S-1-5-11"
+$ruleUsers = New-Object System.Security.AccessControl.FileSystemAccessRule($authenticatedUsers,"ReadAndExecute","ContainerInherit,ObjectInherit","None","Allow")
+$acl.AddAccessRule($ruleUsers)
+
+Set-Acl -Path $scriptsFolder -AclObject $acl
+Write-Host "Rechte für Scripts-Root: Admins Vollzugriff, Benutzer Lesen+Ausführen"
