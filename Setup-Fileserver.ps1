@@ -33,7 +33,7 @@ if ($departments.Count -eq 0) {
 $base = "F:\Shares"
 
 # OU für Gruppen
-$ou = "OU=Gruppen,DC=eHH,DC=de"
+$ou = "OU=Verwaltung,DC=eHH,DC=de"
 
 # Admin-Gruppe mit sicherer Identitätserkennung
 try {
@@ -100,7 +100,7 @@ foreach ($dep in $departments) {
     # Domain Local Gruppe anlegen (falls fehlt)
     if (-not (Get-ADGroup -Filter {Name -eq $dlGroup} -ErrorAction SilentlyContinue)) {
         try {
-            New-ADGroup -Name $dlGroup -GroupScope DomainLocal -Path $ou -GroupCategory Security -Description "Domain Local Gruppe RW für $dep auf Fileserver"
+            New-ADGroup -Name $dlGroup -GroupScope DomainLocal -Path "OU=$dep,DC=eHH,DC=de" -GroupCategory Security -Description "Domain Local Gruppe RW für $dep auf Fileserver"
             $cleanMessage = Remove-EmojiFromString -InputString "Gruppe erstellt: $dlGroup"
             Write-Host $cleanMessage
         }
