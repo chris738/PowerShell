@@ -32,10 +32,15 @@ if ($departments.Count -eq 0) {
 # Basis-Laufwerk
 $base = "F:\Shares"
 
-# "Domain Admins" SID automatisch auflösen
-$domainAdmins = Get-ADGroup "Domain Admins"
-$adminSid = New-Object System.Security.Principal.SecurityIdentifier $domainAdmins.SID
-Write-Host "Verwende Admin-SID: $($domainAdmins.SID)"
+# "Domain Admins" SID sicher auflösen
+try {
+    $adminSid = Get-SafeDomainAdminsIdentity
+    Write-Host "Domain Admins SID erfolgreich aufgelöst"
+}
+catch {
+    Write-ErrorMessage -Message "Kritischer Fehler: Konnte Domain Admins SID nicht auflösen" -Type "Error"
+    exit 1
+}
 
 # Funktion: Ordner anlegen
 function Ensure-Folder {
@@ -50,27 +55,45 @@ function Ensure-Folder {
 function Set-Permissions {
     param([string]$path, [string]$groupRW, [string]$groupR)
 
-    $acl = Get-Acl $path
-    $acl.SetAccessRuleProtection($true, $false)
+    try {
+        $acl = Get-Acl $path
+        $acl.SetAccessRuleProtection($true, $false)
 
-    # Admins Vollzugriff per SID
-    $ruleAdmins = New-Object System.Security.AccessControl.FileSystemAccessRule($adminSid,"FullControl","ContainerInherit,ObjectInherit","None","Allow")
-    $acl.SetAccessRule($ruleAdmins)
+        # Admins Vollzugriff per SID
+        $ruleAdmins = New-Object System.Security.AccessControl.FileSystemAccessRule($adminSid,"FullControl","ContainerInherit,ObjectInherit","None","Allow")
+        $acl.SetAccessRule($ruleAdmins)
 
-    # RW-Gruppe (Modify)
-    if ($groupRW) {
-        $ruleRW = New-Object System.Security.AccessControl.FileSystemAccessRule($groupRW,"Modify","ContainerInherit,ObjectInherit","None","Allow")
-        $acl.AddAccessRule($ruleRW)
+        # RW-Gruppe (Modify)
+        if ($groupRW) {
+            $rwGroup = Get-ADGroup -Filter {Name -eq $groupRW} -ErrorAction SilentlyContinue
+            if (-not $rwGroup) {
+                Write-ErrorMessage -Message "Global-Gruppe $groupRW nicht gefunden!" -Type "NotFound"
+            } else {
+                $rwSid = New-Object System.Security.Principal.SecurityIdentifier $rwGroup.SID
+                $ruleRW = New-Object System.Security.AccessControl.FileSystemAccessRule($rwSid,"Modify","ContainerInherit,ObjectInherit","None","Allow")
+                $acl.AddAccessRule($ruleRW)
+            }
+        }
+
+        # R-Gruppe (Read)
+        if ($groupR) {
+            $rGroup = Get-ADGroup -Filter {Name -eq $groupR} -ErrorAction SilentlyContinue
+            if (-not $rGroup) {
+                Write-ErrorMessage -Message "Global-Gruppe $groupR nicht gefunden!" -Type "NotFound"
+            } else {
+                $rSid = New-Object System.Security.Principal.SecurityIdentifier $rGroup.SID
+                $ruleR = New-Object System.Security.AccessControl.FileSystemAccessRule($rSid,"ReadAndExecute","ContainerInherit,ObjectInherit","None","Allow")
+                $acl.AddAccessRule($ruleR)
+            }
+        }
+
+        Set-Acl -Path $path -AclObject $acl
+        $cleanMessage = Remove-EmojiFromString -InputString "Rechte gesetzt auf $path"
+        Write-Host $cleanMessage
     }
-
-    # R-Gruppe (Read)
-    if ($groupR) {
-        $ruleR = New-Object System.Security.AccessControl.FileSystemAccessRule($groupR,"ReadAndExecute","ContainerInherit,ObjectInherit","None","Allow")
-        $acl.AddAccessRule($ruleR)
+    catch {
+        Write-ErrorMessage -Message "Fehler beim Setzen der Rechte auf $path : $_" -Type "Error"
     }
-
-    Set-Acl -Path $path -AclObject $acl
-    Write-Host "Rechte gesetzt auf $path"
 }
 
 # --- Abteilungen ---
@@ -89,8 +112,14 @@ foreach ($dep in $departments) {
     # Domain Local Gruppen anlegen (falls nicht vorhanden)
     foreach ($grp in @($dlGroupRW, $dlGroupR)) {
         if (-not (Get-ADGroup -Filter {Name -eq $grp} -ErrorAction SilentlyContinue)) {
-            New-ADGroup -Name $grp -GroupScope DomainLocal -GroupCategory Security -Path "OU=$dep,DC=eHH,DC=de" -Description "DL Gruppe für $dep Fileshare"
-            Write-Host "Gruppe erstellt: $grp"
+            try {
+                New-ADGroup -Name $grp -GroupScope DomainLocal -GroupCategory Security -Path "OU=$dep,DC=eHH,DC=de" -Description "DL Gruppe für $dep Fileshare"
+                $cleanMessage = Remove-EmojiFromString -InputString "Gruppe erstellt: $grp"
+                Write-Host $cleanMessage
+            }
+            catch {
+                Write-ErrorMessage -Message "Fehler beim Erstellen der Gruppe $grp : $_" -Type "Error"
+            }
         }
     }
 
@@ -106,8 +135,14 @@ $dlGlobalR  = "DL_Global-FS_R"
 
 foreach ($grp in @($dlGlobalRW, $dlGlobalR)) {
     if (-not (Get-ADGroup -Filter {Name -eq $grp} -ErrorAction SilentlyContinue)) {
-        New-ADGroup -Name $grp -GroupScope DomainLocal -GroupCategory Security -Path "OU=Verwaltung,DC=eHH,DC=de" -Description "DL Gruppe für Global Fileshare"
-        Write-Host "Gruppe erstellt: $grp"
+        try {
+            New-ADGroup -Name $grp -GroupScope DomainLocal -GroupCategory Security -Path "OU=Verwaltung,DC=eHH,DC=de" -Description "DL Gruppe für Global Fileshare"
+            $cleanMessage = Remove-EmojiFromString -InputString "Gruppe erstellt: $grp"
+            Write-Host $cleanMessage
+        }
+        catch {
+            Write-ErrorMessage -Message "Fehler beim Erstellen der Gruppe $grp : $_" -Type "Error"
+        }
     }
 }
 Set-Permissions -path $globalFolder -groupRW $dlGlobalRW -groupR $dlGlobalR

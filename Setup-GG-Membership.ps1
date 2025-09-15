@@ -43,10 +43,17 @@ foreach ($dep in $departments) {
     # GG erstellen
     $ggName = "GG_${dep}-MA"
     if (-not (Get-ADGroup -Filter {Name -eq $ggName} -SearchBase $ouPath -ErrorAction SilentlyContinue)) {
-        New-ADGroup -Name $ggName -GroupScope Global -GroupCategory Security -Path $ouPath -Description "Globale Mitarbeitergruppe $dep"
-        Write-Host "GG erstellt: $ggName"
+        try {
+            New-ADGroup -Name $ggName -GroupScope Global -GroupCategory Security -Path $ouPath -Description "Globale Mitarbeitergruppe $dep"
+            $cleanMessage = Remove-EmojiFromString -InputString "GG erstellt: $ggName"
+            Write-Host $cleanMessage
+        }
+        catch {
+            Write-ErrorMessage -Message "Fehler beim Erstellen der Gruppe $ggName : $_" -Type "Error"
+        }
     } else {
-        Write-Host "GG existiert: $ggName"
+        $cleanMessage = Remove-EmojiFromString -InputString "GG existiert: $ggName"
+        Write-Host $cleanMessage
     }
 
     # Benutzer der OU in GG schieben
@@ -54,10 +61,15 @@ foreach ($dep in $departments) {
     foreach ($u in $users) {
         try {
             Add-ADGroupMember -Identity $ggName -Members $u.SamAccountName -ErrorAction Stop
-            Write-Host "➕ User $($u.SamAccountName) → $ggName"
+            $cleanMessage = Remove-EmojiFromString -InputString "User $($u.SamAccountName) → $ggName"
+            Write-Host $cleanMessage
         }
         catch {
-            Write-Host "User $($u.SamAccountName) ist evtl. schon Mitglied in $ggName"
+            if ($_.Exception.Message -like "*already exists*" -or $_.Exception.Message -like "*bereits vorhanden*") {
+                Write-ErrorMessage -Message "Fehler bei: Das angegebene Konto ist bereits vorhanden." -Type "AlreadyExists" -AdditionalInfo "$($u.SamAccountName) in $ggName"
+            } else {
+                Write-ErrorMessage -Message "User $($u.SamAccountName) konnte nicht zu $ggName hinzugefügt werden: $_" -Type "Error"
+            }
         }
     }
 
@@ -69,16 +81,32 @@ foreach ($dep in $departments) {
     if (Get-ADGroup -Filter {Name -eq $dlRW} -ErrorAction SilentlyContinue) {
         try {
             Add-ADGroupMember -Identity $dlRW -Members $ggName -ErrorAction Stop
-            Write-Host "🔗 $ggName → $dlRW"
-        } catch { Write-Host "$ggName evtl. schon in $dlRW" }
+            $cleanMessage = Remove-EmojiFromString -InputString "$ggName → $dlRW"
+            Write-Host $cleanMessage
+        } 
+        catch { 
+            if ($_.Exception.Message -like "*already exists*" -or $_.Exception.Message -like "*bereits vorhanden*") {
+                Write-ErrorMessage -Message "Fehler bei: Das angegebene Konto ist bereits vorhanden." -Type "AlreadyExists" -AdditionalInfo "$ggName in $dlRW"
+            } else {
+                Write-ErrorMessage -Message "$ggName konnte nicht zu $dlRW hinzugefügt werden: $_" -Type "Error"
+            }
+        }
     }
 
     # GG in DL_R aufnehmen (optional: nur wenn nötig)
     if (Get-ADGroup -Filter {Name -eq $dlR} -ErrorAction SilentlyContinue) {
         try {
             Add-ADGroupMember -Identity $dlR -Members $ggName -ErrorAction Stop
-            Write-Host "🔗 $ggName → $dlR"
-        } catch { Write-Host "$ggName evtl. schon in $dlR" }
+            $cleanMessage = Remove-EmojiFromString -InputString "$ggName → $dlR"
+            Write-Host $cleanMessage
+        } 
+        catch { 
+            if ($_.Exception.Message -like "*already exists*" -or $_.Exception.Message -like "*bereits vorhanden*") {
+                Write-ErrorMessage -Message "Fehler bei: Das angegebene Konto ist bereits vorhanden." -Type "AlreadyExists" -AdditionalInfo "$ggName in $dlR"
+            } else {
+                Write-ErrorMessage -Message "$ggName konnte nicht zu $dlR hinzugefügt werden: $_" -Type "Error"
+            }
+        }
     }
 
     # *** WICHTIG: Alle GG Gruppen zur Global-Gruppe hinzufügen ***
@@ -86,11 +114,20 @@ foreach ($dep in $departments) {
     if (Get-ADGroup -Filter {Name -eq $dlGlobalRW} -ErrorAction SilentlyContinue) {
         try {
             Add-ADGroupMember -Identity $dlGlobalRW -Members $ggName -ErrorAction Stop
-            Write-Host "🌍 $ggName → $dlGlobalRW (Global Zugriff)"
-        } catch { Write-Host "$ggName evtl. schon in $dlGlobalRW" }
+            $cleanMessage = Remove-EmojiFromString -InputString "$ggName → $dlGlobalRW (Global Zugriff)"
+            Write-Host $cleanMessage
+        } 
+        catch { 
+            if ($_.Exception.Message -like "*already exists*" -or $_.Exception.Message -like "*bereits vorhanden*") {
+                Write-ErrorMessage -Message "Fehler bei: Das angegebene Konto ist bereits vorhanden." -Type "AlreadyExists" -AdditionalInfo "$ggName in $dlGlobalRW"
+            } else {
+                Write-ErrorMessage -Message "$ggName konnte nicht zu $dlGlobalRW hinzugefügt werden: $_" -Type "Error"
+            }
+        }
     } else {
-        Write-Host "Global-Gruppe $dlGlobalRW nicht gefunden!"
+        Write-ErrorMessage -Message "Global-Gruppe $dlGlobalRW nicht gefunden!" -Type "NotFound"
     }
 }
 
-Write-Host "Setup abgeschlossen."
+$cleanMessage = Remove-EmojiFromString -InputString "Setup abgeschlossen."
+Write-Host $cleanMessage

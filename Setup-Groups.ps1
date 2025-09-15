@@ -39,8 +39,14 @@ foreach ($dep in $departments) {
     # Globale Gruppe (Mitarbeiter)
     $ggGroup = "GG_${dep}-MA"
     if (-not (Get-ADGroup -Filter {Name -eq $ggGroup} -SearchBase $ouPath -ErrorAction SilentlyContinue)) {
-        New-ADGroup -Name $ggGroup -GroupScope Global -GroupCategory Security -Path $ouPath -Description "Globale Gruppe Mitarbeiter $dep"
-        Write-Host "Gruppe erstellt: $ggGroup in $dep"
+        try {
+            New-ADGroup -Name $ggGroup -GroupScope Global -GroupCategory Security -Path $ouPath -Description "Globale Gruppe Mitarbeiter $dep"
+            $cleanMessage = Remove-EmojiFromString -InputString "Gruppe erstellt: $ggGroup in $dep"
+            Write-Host $cleanMessage
+        }
+        catch {
+            Write-ErrorMessage -Message "Fehler beim Erstellen der Gruppe $ggGroup : $_" -Type "Error"
+        }
     }
 
     # Domain Local Gruppen (FS-Rechte) - RW und R
@@ -49,9 +55,15 @@ foreach ($dep in $departments) {
     
     foreach ($dlGroup in @($dlGroupRW, $dlGroupR)) {
         if (-not (Get-ADGroup -Filter {Name -eq $dlGroup} -SearchBase $ouPath -ErrorAction SilentlyContinue)) {
-            $description = if ($dlGroup -like "*_RW") { "Domain Local Gruppe FS RW $dep" } else { "Domain Local Gruppe FS R $dep" }
-            New-ADGroup -Name $dlGroup -GroupScope DomainLocal -GroupCategory Security -Path $ouPath -Description $description
-            Write-Host "Gruppe erstellt: $dlGroup in $dep"
+            try {
+                $description = if ($dlGroup -like "*_RW") { "Domain Local Gruppe FS RW $dep" } else { "Domain Local Gruppe FS R $dep" }
+                New-ADGroup -Name $dlGroup -GroupScope DomainLocal -GroupCategory Security -Path $ouPath -Description $description
+                $cleanMessage = Remove-EmojiFromString -InputString "Gruppe erstellt: $dlGroup in $dep"
+                Write-Host $cleanMessage
+            }
+            catch {
+                Write-ErrorMessage -Message "Fehler beim Erstellen der Gruppe $dlGroup : $_" -Type "Error"
+            }
         }
     }
 
@@ -59,10 +71,15 @@ foreach ($dep in $departments) {
     foreach ($dlGroup in @($dlGroupRW, $dlGroupR)) {
         try {
             Add-ADGroupMember -Identity $dlGroup -Members $ggGroup -ErrorAction Stop
-            Write-Host "$ggGroup → $dlGroup"
+            $cleanMessage = Remove-EmojiFromString -InputString "$ggGroup → $dlGroup"
+            Write-Host $cleanMessage
         }
         catch {
-            Write-Host "$ggGroup konnte nicht in $dlGroup eingefügt werden ($_)" -ForegroundColor Yellow
+            if ($_.Exception.Message -like "*already exists*" -or $_.Exception.Message -like "*bereits vorhanden*") {
+                Write-ErrorMessage -Message "Fehler bei: Das angegebene Konto ist bereits vorhanden." -Type "AlreadyExists" -AdditionalInfo "$ggGroup in $dlGroup"
+            } else {
+                Write-ErrorMessage -Message "$ggGroup konnte nicht in $dlGroup eingefügt werden: $_" -Type "Error"
+            }
         }
     }
 }

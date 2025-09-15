@@ -51,6 +51,13 @@ foreach ($user in $users) {
     $pwd = ConvertTo-SecureString "Start123!" -AsPlainText -Force
 
     try {
+        # Prüfen ob Benutzer bereits existiert
+        $existingUser = Get-ADUser -Filter {SamAccountName -eq $sam} -ErrorAction SilentlyContinue
+        if ($existingUser) {
+            Write-ErrorMessage -Message "Fehler bei: Das angegebene Konto ist bereits vorhanden." -Type "AlreadyExists" -AdditionalInfo $sam
+            continue
+        }
+
         New-ADUser `
             -Name $display `
             -GivenName $user.Vorname `
@@ -63,9 +70,14 @@ foreach ($user in $users) {
             -ChangePasswordAtLogon $true `
             -Enabled $true
 
-        Write-Host "Benutzer $display erfolgreich angelegt: $sam in $ouPath" -ForegroundColor Green
+        $cleanMessage = Remove-EmojiFromString -InputString "Benutzer $display erfolgreich angelegt: $sam in $ouPath"
+        Write-Host $cleanMessage -ForegroundColor Green
     }
     catch {
-        Write-Host "Fehler bei $display ($sam): $_" -ForegroundColor Red
+        if ($_.Exception.Message -like "*already exists*" -or $_.Exception.Message -like "*bereits vorhanden*") {
+            Write-ErrorMessage -Message "Fehler bei: Das angegebene Konto ist bereits vorhanden." -Type "AlreadyExists" -AdditionalInfo $sam
+        } else {
+            Write-ErrorMessage -Message "Fehler bei $display ($sam): $_" -Type "Error"
+        }
     }
 }
