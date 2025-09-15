@@ -60,16 +60,16 @@ foreach ($ou in $ous) {
         if (-not (Test-Path $userFolder)) {
             try {
                 New-Item -ItemType Directory -Path $userFolder -Force -ErrorAction Stop | Out-Null
-                Write-Host "📂 Ordner erstellt: $userFolder"
+                Write-Host "Ordner erstellt: $userFolder"
             }
             catch {
-                Write-Warning "⚠️ Konnte $userFolder nicht erstellen: $_"
+                Write-Warning "Konnte $userFolder nicht erstellen: $_"
                 continue
             }
         }
 
         if (-not (Test-Path $userFolder)) {
-            Write-Warning "⚠️ Ordner fehlt weiterhin: $userFolder"
+            Write-Warning "Ordner fehlt weiterhin: $userFolder"
             continue
         }
 
@@ -85,10 +85,10 @@ foreach ($ou in $ous) {
 			$acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($uSid,"Modify","ContainerInherit,ObjectInherit","None","Allow")))
 
 			Set-Acl -Path $userFolder -AclObject $acl
-			Write-Host "✔ NTFS für $folderName gesetzt."
+			Write-Host "NTFS für $folderName gesetzt."
 		}
 		catch {
-			Write-Warning "⚠️ ACL-Fehler bei ${userFolder}: $_"
+			Write-Warning "ACL-Fehler bei ${userFolder}: $_"
 			continue
 		}
 
@@ -96,10 +96,10 @@ foreach ($ou in $ous) {
         # Home-Laufwerk eintragen
         try {
             Set-ADUser $u -HomeDirectory $uncPath -HomeDrive "H:"
-            Write-Host "✔ $($u.SamAccountName): HomeDrive=H: ($uncPath)"
+            Write-Host "$($u.SamAccountName): HomeDrive=H: ($uncPath)"
         }
         catch {
-            Write-Warning "⚠️ Konnte HomeDrive für $($u.SamAccountName) nicht setzen: $_"
+            Write-Warning "Konnte HomeDrive für $($u.SamAccountName) nicht setzen: $_"
         }
     }
 }

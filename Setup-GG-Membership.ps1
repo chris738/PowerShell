@@ -44,9 +44,9 @@ foreach ($dep in $departments) {
     $ggName = "GG_${dep}-MA"
     if (-not (Get-ADGroup -Filter {Name -eq $ggName} -SearchBase $ouPath -ErrorAction SilentlyContinue)) {
         New-ADGroup -Name $ggName -GroupScope Global -GroupCategory Security -Path $ouPath -Description "Globale Mitarbeitergruppe $dep"
-        Write-Host "👥 GG erstellt: $ggName"
+        Write-Host "GG erstellt: $ggName"
     } else {
-        Write-Host "ℹ️ GG existiert: $ggName"
+        Write-Host "GG existiert: $ggName"
     }
 
     # Benutzer der OU in GG schieben
@@ -57,7 +57,7 @@ foreach ($dep in $departments) {
             Write-Host "➕ User $($u.SamAccountName) → $ggName"
         }
         catch {
-            Write-Host "⚠️ User $($u.SamAccountName) ist evtl. schon Mitglied in $ggName"
+            Write-Host "User $($u.SamAccountName) ist evtl. schon Mitglied in $ggName"
         }
     }
 
@@ -70,7 +70,7 @@ foreach ($dep in $departments) {
         try {
             Add-ADGroupMember -Identity $dlRW -Members $ggName -ErrorAction Stop
             Write-Host "🔗 $ggName → $dlRW"
-        } catch { Write-Host "⚠️ $ggName evtl. schon in $dlRW" }
+        } catch { Write-Host "$ggName evtl. schon in $dlRW" }
     }
 
     # GG in DL_R aufnehmen (optional: nur wenn nötig)
@@ -78,7 +78,7 @@ foreach ($dep in $departments) {
         try {
             Add-ADGroupMember -Identity $dlR -Members $ggName -ErrorAction Stop
             Write-Host "🔗 $ggName → $dlR"
-        } catch { Write-Host "⚠️ $ggName evtl. schon in $dlR" }
+        } catch { Write-Host "$ggName evtl. schon in $dlR" }
     }
 
     # *** WICHTIG: Alle GG Gruppen zur Global-Gruppe hinzufügen ***
@@ -87,10 +87,10 @@ foreach ($dep in $departments) {
         try {
             Add-ADGroupMember -Identity $dlGlobalRW -Members $ggName -ErrorAction Stop
             Write-Host "🌍 $ggName → $dlGlobalRW (Global Zugriff)"
-        } catch { Write-Host "⚠️ $ggName evtl. schon in $dlGlobalRW" }
+        } catch { Write-Host "$ggName evtl. schon in $dlGlobalRW" }
     } else {
-        Write-Host "⚠️ Global-Gruppe $dlGlobalRW nicht gefunden!"
+        Write-Host "Global-Gruppe $dlGlobalRW nicht gefunden!"
     }
 }
 
-Write-Host "✅ Setup abgeschlossen."
+Write-Host "Setup abgeschlossen."

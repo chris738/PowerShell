@@ -43,7 +43,7 @@ function Ensure-Folder {
     param([string]$path)
     if (-Not (Test-Path $path)) {
         New-Item -Path $path -ItemType Directory -Force | Out-Null
-        Write-Host "📂 Ordner erstellt: $path"
+        Write-Host "Ordner erstellt: $path"
     }
 }
 
@@ -65,7 +65,7 @@ function Set-Permissions {
     }
 
     Set-Acl -Path $path -AclObject $acl
-    Write-Host "✅ Rechte gesetzt: $group → $rights auf $path"
+    Write-Host "Rechte gesetzt: $group → $rights auf $path"
 }
 
 # Struktur aufbauen
@@ -79,7 +79,7 @@ foreach ($dep in $departments) {
     # Domain Local Gruppe anlegen (falls fehlt)
     if (-not (Get-ADGroup -Filter {Name -eq $dlGroup} -ErrorAction SilentlyContinue)) {
         New-ADGroup -Name $dlGroup -GroupScope DomainLocal -Path $ou -GroupCategory Security -Description "Domain Local Gruppe RW für $dep auf Fileserver"
-        Write-Host "👥 Gruppe erstellt: $dlGroup"
+        Write-Host "Gruppe erstellt: $dlGroup"
     }
 
     # Rechte setzen
@@ -92,10 +92,10 @@ Ensure-Folder $globalFolder
 $dlGlobal = "DL_Global-FS_RW"
 if (-not (Get-ADGroup -Filter {Name -eq $dlGlobal} -ErrorAction SilentlyContinue)) {
     New-ADGroup -Name $dlGlobal -GroupScope DomainLocal -Path $ou -GroupCategory Security -Description "Domain Local Gruppe RW für Global"
-    Write-Host "👥 Gruppe erstellt: $dlGlobal"
+    Write-Host "Gruppe erstellt: $dlGlobal"
 }
 Set-Permissions -path $globalFolder -group $dlGlobal -rights "Modify"
 
 # Home-Verzeichnis
 Ensure-Folder "$base\Home"
-Write-Host "ℹ️ Home-Verzeichnis erstellt, Rechte werden später pro User vergeben."
+Write-Host "Home-Verzeichnis erstellt, Rechte werden später pro User vergeben."

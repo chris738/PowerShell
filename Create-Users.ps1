@@ -42,9 +42,9 @@ foreach ($user in $users) {
             -ChangePasswordAtLogon $true `
             -Enabled $true
 
-        Write-Host "✅ Benutzer $display erfolgreich angelegt in $ouPath"
+        Write-Host "Benutzer $display erfolgreich angelegt in $ouPath"
     }
     catch {
-        Write-Host "❌ Fehler bei: $_"
+        Write-Host "Fehler bei: $_"
     }
 }

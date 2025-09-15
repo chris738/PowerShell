@@ -25,7 +25,7 @@ function Get-DepartmentsFromCSV {
     try {
         $users = Import-Csv -Path $CsvPath -Delimiter ";"
         $departments = $users | Select-Object -ExpandProperty Abteilung -Unique | Where-Object { $_ -ne "" }
-        Write-Host "✅ Gefundene Abteilungen aus CSV: $($departments -join ', ')" -ForegroundColor Green
+        Write-Host "Gefundene Abteilungen aus CSV: $($departments -join ', ')" -ForegroundColor Green
         return $departments
     }
     catch {
@@ -72,7 +72,7 @@ function Test-CsvFile {
             }
         }
         
-        Write-Host "✅ CSV-Datei Format ist korrekt" -ForegroundColor Green
+        Write-Host "CSV-Datei Format ist korrekt" -ForegroundColor Green
         return $true
     }
     catch {
