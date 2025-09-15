@@ -16,7 +16,10 @@ param(
     [switch]$SkipFileserver,
     
     [Parameter(Mandatory=$false)]
-    [switch]$SkipHomeFolders
+    [switch]$SkipHomeFolders,
+    
+    [Parameter(Mandatory=$false)]
+    [switch]$SkipNetworkShares
 )
 
 # Lade gemeinsame Funktionen
@@ -44,6 +47,7 @@ $scripts = @(
     @{Name="Create-Users.ps1"; Skip=$SkipUsers; Description="Erstelle Benutzer"},
     @{Name="Setup-GG-Membership.ps1"; Skip=$SkipGroups; Description="Gruppenmitgliedschaften"},
     @{Name="Setup-Fileserver.ps1"; Skip=$SkipFileserver; Description="Fileserver-Struktur"},
+    @{Name="Setup-NetworkShares.ps1"; Skip=$SkipNetworkShares; Description="Netzwerkfreigaben"},
     @{Name="Setup-Fileserver-Rights.ps1"; Skip=$SkipFileserver; Description="Fileserver-Rechte"},
     @{Name="Create-HomeFolders.ps1"; Skip=$SkipHomeFolders; Description="Home-Ordner"}
 )
