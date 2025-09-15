@@ -41,7 +41,7 @@ Beispiel siehe: `Userlist-EchtHamburg.csv`
 .\Run-All-Scripts.ps1 -CsvFile "C:\path\to\users.csv"
 
 # Einzelne Schritte überspringen
-.\Run-All-Scripts.ps1 -SkipUsers -SkipHomeFolders
+.\Run-All-Scripts.ps1 -SkipUsers -SkipHomeFolders -SkipNetworkShares
 ```
 
 ## Skripte
@@ -53,12 +53,14 @@ Beispiel siehe: `Userlist-EchtHamburg.csv`
 | `Setup-GG-Membership.ps1` | Fügt Benutzer in Gruppen hinzu | Ja |
 | `Create-HomeFolders.ps1` | Erstellt Home-Verzeichnisse und Laufwerkszuordnungen | Ja |
 | `Setup-Fileserver.ps1` | Erstellt Fileserver-Struktur | Ja |
+| `Setup-NetworkShares.ps1` | **NEU** - Erstellt Netzwerkfreigaben (SMB Shares) | Ja |
 | `Setup-Fileserver-Rights.ps1` | Setzt Fileserver-Berechtigungen | Ja |
 | `Run-All-Scripts.ps1` | **Master-Skript** - führt alle aus | Ja |
 | `Common-Functions.ps1` | Gemeinsame Funktionen | - |
 | `Test-Scripts.ps1` | Testet alle Skripte | - |
 | `Test-DriveMapping.ps1` | Testet Laufwerkszuordnungen | - |
 | `Test-SamAccountChanges.ps1` | Demonstriert SAM Account Änderungen | - |
+| `Test-NetworkShares.ps1` | **NEU** - Testet Netzwerkfreigaben-Setup | - |
 
 ## Laufwerkszuordnungen
 
@@ -74,6 +76,19 @@ Die Skripte erstellen automatisch folgende Laufwerkszuordnungen für jeden Benut
 **Server-Erkennung**: Automatische Domain Controller Erkennung mit Fallback
 
 Die Laufwerkszuordnungen werden über Logon-Scripts realisiert, die automatisch für jeden Benutzer erstellt werden.
+
+## Netzwerkfreigaben
+
+Das neue `Setup-NetworkShares.ps1` Skript erstellt automatisch folgende SMB-Netzwerkfreigaben:
+
+| Freigabe | Pfad | Beschreibung | Berechtigungen |
+|----------|------|--------------|---------------|
+| **Home$** | `F:\Shares\Home` | Home-Verzeichnisse | Authenticated Users (Change) |
+| **Global$** | `F:\Shares\Global` | Globales Verzeichnis | DL_Global-FS_RW (Change) |
+| **Abteilungen$** | `F:\Shares\Abteilungen` | Abteilungsverzeichnisse | DL_{Abteilung}-FS_RW (Change) |
+| **Scripts$** | `F:\Shares\Scripts` | Logon-Scripts | Authenticated Users (Read) |
+
+**Hinweis**: Dieses Skript funktioniert nur auf Windows Servern mit SMB-Features.
 
 ## Testen
 
