@@ -284,3 +284,77 @@ function Get-SafeDomainAdminsIdentity {
         throw
     }
 }
+
+function Get-LocalizedAccountName {
+    <#
+    .SYNOPSIS
+    Ruft den lokalisierten Kontonamen für Well-Known Security Principals ab
+    Unterstützt deutsche und englische Lokalisierungen
+    
+    .PARAMETER WellKnownAccount
+    Der Well-Known Account Name (z.B. "Everyone", "Authenticated Users")
+    
+    .RETURNS
+    Lokalisierter Account Name oder SID falls Name nicht aufgelöst werden kann
+    #>
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$WellKnownAccount
+    )
+    
+    try {
+        # Mapping für bekannte Accounts
+        $accountMapping = @{
+            "Everyone" = @("Jeder", "Everyone", "S-1-1-0")
+            "Authenticated Users" = @("Authentifizierte Benutzer", "Authenticated Users", "S-1-5-11") 
+            "Users" = @("Benutzer", "Users", "S-1-5-32-545")
+            "Administrators" = @("Administratoren", "Administrators", "S-1-5-32-544")
+        }
+        
+        if (-not $accountMapping.ContainsKey($WellKnownAccount)) {
+            Write-Host "Warnung: Unbekannter Well-Known Account '$WellKnownAccount'" -ForegroundColor Yellow
+            return $WellKnownAccount
+        }
+        
+        $possibleNames = $accountMapping[$WellKnownAccount]
+        
+        # Versuche jeden möglichen Namen
+        foreach ($name in $possibleNames) {
+            try {
+                # Teste ob der Account aufgelöst werden kann
+                if ($name.StartsWith("S-1-")) {
+                    # Es ist eine SID - versuche sie direkt zu verwenden
+                    $sid = New-Object System.Security.Principal.SecurityIdentifier $name
+                    $account = $sid.Translate([System.Security.Principal.NTAccount])
+                    Write-Host "Account '$WellKnownAccount' erfolgreich über SID aufgelöst: $($account.Value)" -ForegroundColor Green
+                    return $account.Value
+                } else {
+                    # Es ist ein Name - versuche ihn zu einer SID aufzulösen
+                    $ntAccount = New-Object System.Security.Principal.NTAccount $name
+                    $sid = $ntAccount.Translate([System.Security.Principal.SecurityIdentifier])
+                    Write-Host "Account '$WellKnownAccount' erfolgreich aufgelöst: $name" -ForegroundColor Green
+                    return $name
+                }
+            }
+            catch {
+                # Dieser Name funktioniert nicht, versuche den nächsten
+                continue
+            }
+        }
+        
+        # Fallback: Verwende die SID direkt
+        $sidValue = $possibleNames | Where-Object { $_.StartsWith("S-1-") } | Select-Object -First 1
+        if ($sidValue) {
+            Write-Host "Fallback: Verwende SID für '$WellKnownAccount': $sidValue" -ForegroundColor Yellow
+            return $sidValue
+        }
+        
+        # Letzter Fallback: Originaler Name
+        Write-Host "Warnung: Konnte '$WellKnownAccount' nicht auflösen, verwende Originalname" -ForegroundColor Yellow
+        return $WellKnownAccount
+    }
+    catch {
+        Write-Host "Fehler beim Auflösen von '$WellKnownAccount': $_" -ForegroundColor Red
+        return $WellKnownAccount
+    }
+}
