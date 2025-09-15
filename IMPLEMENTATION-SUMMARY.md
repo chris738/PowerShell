@@ -88,3 +88,22 @@ Alle Anforderungen sind vollständig erfüllt:
 - ✅ Globales Verzeichnis eingebunden (G:)
 - ✅ Abteilungsverzeichnis eingebunden (S:)
 - ✅ Funktionalität bleibt vollständig erhalten
+
+## Deutsche Lokalisierung (Bugfix)
+
+**Problem**: Setup-NetworkShares.ps1 versagte auf deutschen Windows Servern mit dem Fehler:
+> "Zuordnungen von Kontennamen und Sicherheitskennungen wurden nicht durchgeführt"
+
+**Ursache**: Hardcodierte englische Kontennamen ("Everyone", "Authenticated Users") werden auf deutschen Systemen nicht erkannt.
+
+**Lösung**: 
+- **Get-LocalizedAccountName** Funktion in Common-Functions.ps1 hinzugefügt
+- **Automatische Erkennung** deutscher/englischer Kontennamen
+- **Fallback-Mechanismus** über SIDs bei Namensauflösungsfehlern
+- **Setup-NetworkShares.ps1** aktualisiert für lokalisierte Kontonamen
+
+**Unterstützte Mappings**:
+- "Everyone" → "Jeder" (deutsch) / "Everyone" (englisch) / "S-1-1-0" (SID)
+- "Authenticated Users" → "Authentifizierte Benutzer" (deutsch) / "Authenticated Users" (englisch) / "S-1-5-11" (SID)
+
+Das Skript funktioniert jetzt zuverlässig auf deutschen und englischen Windows Servern.

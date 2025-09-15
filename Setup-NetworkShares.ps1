@@ -136,14 +136,16 @@ function Setup-NetworkShare {
             return
         }
 
-        # Share erstellen
-        New-SmbShare -Name $ShareName -Path $SharePath -Description $Description -FullAccess "Everyone" | Out-Null
+        # Share erstellen mit lokalisiertem Account-Namen
+        $everyoneAccount = Get-LocalizedAccountName -WellKnownAccount "Everyone"
+        New-SmbShare -Name $ShareName -Path $SharePath -Description $Description -FullAccess $everyoneAccount | Out-Null
         Write-Host "Netzwerkfreigabe erstellt: $ShareName -> $SharePath"
 
         # Erweiterte Berechtigungen setzen falls angegeben
         if ($FullAccessUsers.Count -gt 0 -or $ChangeAccessUsers.Count -gt 0 -or $ReadAccessUsers.Count -gt 0) {
-            # Erst Everyone entfernen
-            Revoke-SmbShareAccess -Name $ShareName -AccountName "Everyone" -Force -ErrorAction SilentlyContinue
+            # Erst Everyone entfernen (mit lokalisiertem Namen)
+            $everyoneAccount = Get-LocalizedAccountName -WellKnownAccount "Everyone"
+            Revoke-SmbShareAccess -Name $ShareName -AccountName $everyoneAccount -Force -ErrorAction SilentlyContinue
 
             # Domain Admins mit sicherer Identitätserkennung
             try {
@@ -194,7 +196,8 @@ Write-Host "Starte Erstellung der Netzwerkfreigaben..." -ForegroundColor Cyan
 
 # 1. Home-Share (Home$)
 $homeSharePath = Join-Path $basePath "Home"
-Setup-NetworkShare -ShareName "Home$" -SharePath $homeSharePath -Description "Home-Verzeichnisse der Benutzer" -ChangeAccessUsers @("Authenticated Users")
+$authenticatedUsers = Get-LocalizedAccountName -WellKnownAccount "Authenticated Users"
+Setup-NetworkShare -ShareName "Home$" -SharePath $homeSharePath -Description "Home-Verzeichnisse der Benutzer" -ChangeAccessUsers @($authenticatedUsers)
 
 # 2. Global-Share (Global$) 
 $globalSharePath = Join-Path $basePath "Global"
@@ -211,7 +214,8 @@ Setup-NetworkShare -ShareName "Abteilungen$" -SharePath $departmentsSharePath -D
 
 # 4. Scripts-Share (Scripts$) - für Logon-Scripts
 $scriptsSharePath = Join-Path $basePath "Scripts"
-Setup-NetworkShare -ShareName "Scripts$" -SharePath $scriptsSharePath -Description "Benutzer Logon-Scripts" -ReadAccessUsers @("Authenticated Users")
+$authenticatedUsers = Get-LocalizedAccountName -WellKnownAccount "Authenticated Users"
+Setup-NetworkShare -ShareName "Scripts$" -SharePath $scriptsSharePath -Description "Benutzer Logon-Scripts" -ReadAccessUsers @($authenticatedUsers)
 
 Write-Host "Alle Netzwerkfreigaben wurden erfolgreich erstellt!" -ForegroundColor Green
 
