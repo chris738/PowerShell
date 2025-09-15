@@ -62,6 +62,27 @@ function Test-AccountExists {
         return $false
     }
     
+    # Spezielle Behandlung für bekannte Systemgruppen
+    $wellKnownAccounts = @{
+        "Authenticated Users" = "S-1-5-11"
+        "Everyone" = "S-1-1-0"
+        "Domain Admins" = $null  # Wird über Get-SafeDomainAdminsIdentity aufgelöst
+        "Domänen-Admins" = $null  # Wird über Get-SafeDomainAdminsIdentity aufgelöst
+    }
+    
+    if ($wellKnownAccounts.ContainsKey($AccountName)) {
+        if ($AccountName -in @("Domain Admins", "Domänen-Admins")) {
+            try {
+                $adminIdentity = Get-SafeDomainAdminsIdentity
+                return $true
+            }
+            catch {
+                return $false
+            }
+        }
+        return $true  # Andere bekannte Accounts sind immer verfügbar
+    }
+    
     try {
         # Versuche das Konto über Active Directory zu finden
         $account = Get-ADObject -Filter "Name -eq '$AccountName' -or SamAccountName -eq '$AccountName'" -ErrorAction SilentlyContinue
@@ -99,15 +120,42 @@ function Grant-SafeSmbShareAccess {
         return $false
     }
     
-    try {
-        Grant-SmbShareAccess -Name $ShareName -AccountName $AccountName -AccessRight $AccessRight -Force -ErrorAction Stop
-        Write-Host "Berechtigung gesetzt: $AccountName ($AccessRight) für $ShareName" -ForegroundColor Green
-        return $true
+    # Warte kurz und prüfe ob Share verfügbar ist (bis zu 3 Versuche)
+    $maxRetries = 3
+    $retryDelay = 2
+    
+    for ($i = 1; $i -le $maxRetries; $i++) {
+        try {
+            # Prüfe ob Share existiert
+            $share = Get-SmbShare -Name $ShareName -ErrorAction SilentlyContinue
+            if (-not $share) {
+                if ($i -lt $maxRetries) {
+                    Write-Host "Share '$ShareName' noch nicht verfügbar, warte ${retryDelay}s... (Versuch $i/$maxRetries)" -ForegroundColor Yellow
+                    Start-Sleep -Seconds $retryDelay
+                    continue
+                } else {
+                    Write-Host "Warnung: Share '$ShareName' nicht gefunden nach $maxRetries Versuchen" -ForegroundColor Yellow
+                    return $false
+                }
+            }
+            
+            # Setze Berechtigung
+            Grant-SmbShareAccess -Name $ShareName -AccountName $AccountName -AccessRight $AccessRight -Force -ErrorAction Stop
+            Write-Host "Berechtigung gesetzt: $AccountName ($AccessRight) für $ShareName" -ForegroundColor Green
+            return $true
+        }
+        catch {
+            if ($i -lt $maxRetries) {
+                Write-Host "Berechtigung fehlgeschlagen (Versuch $i/$maxRetries), versuche erneut in ${retryDelay}s: $_" -ForegroundColor Yellow
+                Start-Sleep -Seconds $retryDelay
+            } else {
+                Write-Host "Warnung: Konnte Berechtigung für '$AccountName' nicht setzen nach $maxRetries Versuchen: $_" -ForegroundColor Yellow
+                return $false
+            }
+        }
     }
-    catch {
-        Write-Host "Warnung: Konnte Berechtigung für '$AccountName' nicht setzen: $_" -ForegroundColor Yellow
-        return $false
-    }
+    
+    return $false
 }
 
 # Funktion: Netzwerkfreigabe erstellen oder aktualisieren
@@ -140,6 +188,9 @@ function Setup-NetworkShare {
         New-SmbShare -Name $ShareName -Path $SharePath -Description $Description -FullAccess "Everyone" | Out-Null
         Write-Host "Netzwerkfreigabe erstellt: $ShareName -> $SharePath"
 
+        # Kurz warten damit Share vollständig verfügbar ist
+        Start-Sleep -Seconds 1
+
         # Erweiterte Berechtigungen setzen falls angegeben
         if ($FullAccessUsers.Count -gt 0 -or $ChangeAccessUsers.Count -gt 0 -or $ReadAccessUsers.Count -gt 0) {
             # Erst Everyone entfernen
@@ -156,6 +207,8 @@ function Setup-NetworkShare {
                     if (-not (Grant-SafeSmbShareAccess -ShareName $ShareName -AccountName "Domain Admins" -AccessRight "Full")) {
                         # Letzter Fallback: SID verwenden
                         try {
+                            # Warte kurz und versuche erneut mit SID
+                            Start-Sleep -Seconds 1
                             Grant-SmbShareAccess -Name $ShareName -AccountName $adminSid -AccessRight Full -Force -ErrorAction Stop
                             Write-Host "Domain Admins Berechtigung über SID gesetzt" -ForegroundColor Green
                         }
