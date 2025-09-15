@@ -113,38 +113,17 @@ foreach ($ou in $ous) {
             Write-Warning "Konnte HomeDrive für $($u.SamAccountName) nicht setzen: $_"
         }
 
-        # Zusätzliche Laufwerkszuordnungen über ScriptPath setzen
+        # Benutzer-spezifische Logon-Scripts entfernt
+        # Laufwerkszuordnungen G: und S: sollten über Group Policy Preferences oder zentrale Skripte verwaltet werden
         try {
-            # Global-Laufwerk G: und Abteilungs-Laufwerk S: über Logon-Script
-            $globalPath = "\\$server\Global$"
-            $departmentPath = "\\$server\Abteilungen$\$ou"
+            # Entferne eventuell vorhandene ScriptPath-Zuweisungen
+            Set-ADUser $u -ScriptPath $null
             
-            # Logon-Script erstellen für Laufwerkszuordnungen
-            $scriptContent = @"
-@echo off
-net use G: "$globalPath" /persistent:yes >nul 2>&1
-net use S: "$departmentPath" /persistent:yes >nul 2>&1
-"@
-            
-            # Script-Verzeichnis sicherstellen
-            $scriptDir = "F:\Shares\Scripts"
-            if (-not (Test-Path $scriptDir)) {
-                New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
-            }
-            
-            # Benutzer-spezifisches Logon-Script erstellen
-            $scriptFileName = "${sam}_logon.bat"
-            $scriptFilePath = Join-Path $scriptDir $scriptFileName
-            $scriptContent | Out-File -FilePath $scriptFilePath -Encoding ASCII -Force
-            
-            # Script-Pfad im AD-Benutzer setzen
-            Set-ADUser $u -ScriptPath $scriptFileName
-            
-            $cleanMessage = Remove-EmojiFromString -InputString "${sam}: Laufwerkszuordnungen gesetzt - H: ($uncPath), G: ($globalPath), S: ($departmentPath)"
+            $cleanMessage = Remove-EmojiFromString -InputString "${sam}: Home-Verzeichnis konfiguriert - H: ($uncPath). Laufwerkszuordnungen G: und S: über Group Policy verwalten."
             Write-Host $cleanMessage
         }
         catch {
-            Write-Warning "Konnte Laufwerkszuordnungen für $($u.SamAccountName) nicht setzen: $_"
+            Write-Warning "Konnte ScriptPath für $($u.SamAccountName) nicht entfernen: $_"
         }
     }
 }

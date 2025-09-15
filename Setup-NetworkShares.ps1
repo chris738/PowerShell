@@ -212,13 +212,11 @@ foreach ($dep in $departments) {
 }
 Setup-NetworkShare -ShareName "Abteilungen$" -SharePath $departmentsSharePath -Description "Abteilungsverzeichnisse" -ChangeAccessUsers $departmentGroups
 
-# 4. Scripts-Share (Scripts$) - für Logon-Scripts
-$scriptsSharePath = Join-Path $basePath "Scripts"
-$authenticatedUsers = Get-LocalizedAccountName -WellKnownAccount "Authenticated Users"
-Setup-NetworkShare -ShareName "Scripts$" -SharePath $scriptsSharePath -Description "Benutzer Logon-Scripts" -ReadAccessUsers @($authenticatedUsers)
+# Scripts-Share entfernt - Benutzer-spezifische Logon-Scripts werden nicht mehr verwendet
+# Laufwerkszuordnungen sollten über Group Policy Preferences verwaltet werden
 
 Write-Host "Alle Netzwerkfreigaben wurden erfolgreich erstellt!" -ForegroundColor Green
 
 # Freigaben anzeigen
 Write-Host "`nErstelle Freigaben:" -ForegroundColor Yellow
-Get-SmbShare | Where-Object { $_.Name -in @("Home$", "Global$", "Abteilungen$", "Scripts$") } | Format-Table Name, Path, Description -AutoSize
+Get-SmbShare | Where-Object { $_.Name -in @("Home$", "Global$", "Abteilungen$") } | Format-Table Name, Path, Description -AutoSize
