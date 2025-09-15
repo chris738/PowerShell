@@ -80,3 +80,74 @@ function Test-CsvFile {
         return $false
     }
 }
+
+function Get-DomainControllerServer {
+    <#
+    .SYNOPSIS
+    Ermittelt den Domain Controller Server für Laufwerkszuordnungen
+    
+    .DESCRIPTION
+    Versucht zuerst den aktuellen Server zu verwenden (wo das Script läuft),
+    dann den Domain Controller, und falls nötig eine IP-Adresse
+    
+    .RETURNS
+    Servername oder IP-Adresse für UNC-Pfade
+    #>
+    try {
+        # Zuerst: Aktueller Server (wo Script läuft)
+        $currentServer = $env:COMPUTERNAME
+        if ($currentServer) {
+            Write-Host "Verwende aktuellen Server: $currentServer" -ForegroundColor Green
+            return $currentServer
+        }
+        
+        # Fallback: Domain Controller ermitteln
+        $domain = Get-ADDomain -ErrorAction SilentlyContinue
+        if ($domain -and $domain.PDCEmulator) {
+            $dcServer = $domain.PDCEmulator.Split('.')[0]  # Nur Hostname ohne Domain
+            Write-Host "Domain Controller ermittelt: $dcServer" -ForegroundColor Green
+            return $dcServer
+        }
+        
+        # Letzter Fallback: localhost
+        Write-Warning "Konnte keinen Server ermitteln, verwende localhost"
+        return "localhost"
+    }
+    catch {
+        Write-Warning "Fehler bei Server-Ermittlung: $_"
+        # Notfall-Fallback: localhost
+        return "localhost"
+    }
+}
+
+function Get-SamAccountName {
+    <#
+    .SYNOPSIS
+    Erstellt SAM Account Name im Format Vorname.Nachname
+    
+    .PARAMETER Vorname
+    Vorname des Benutzers
+    
+    .PARAMETER Nachname  
+    Nachname des Benutzers
+    
+    .RETURNS
+    SAM Account Name im Format "vorname.nachname" (lowercase)
+    #>
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Vorname,
+        
+        [Parameter(Mandatory=$true)]
+        [string]$Nachname
+    )
+    
+    $cleanVorname = ($Vorname -replace '\s+','').Trim()
+    $cleanNachname = ($Nachname -replace '\s+','').Trim()
+    
+    if (-not $cleanVorname -or -not $cleanNachname) {
+        throw "Vorname und Nachname dürfen nicht leer sein"
+    }
+    
+    return "$cleanVorname.$cleanNachname".ToLower()
+}
