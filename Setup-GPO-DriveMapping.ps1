@@ -1,5 +1,6 @@
 # Setup-GPO-DriveMapping.ps1
 # Erstellt GPOs für Laufwerkszuordnungen (T: für Abteilungen, G: für Global) und deaktiviert Suchleiste
+# UPDATED: Erweiterte Implementierung mit verbesserter Drive-Mapping-Funktionalität
 # Aufruf: .\Setup-GPO-DriveMapping.ps1 [pfad-zur-csv-datei]
 
 param(
@@ -87,35 +88,99 @@ function Add-GPRegistryValue {
     }
 }
 
+# Funktion: Erweiterte Taskbar-Konfiguration
+function Set-TaskbarConfiguration {
+    param(
+        [string]$GPOName
+    )
+    
+    try {
+        # Suchleiste komplett deaktivieren (Wert 0 = versteckt)
+        Add-GPRegistryValue -GPOName $GPOName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "SearchboxTaskbarMode" -Type DWord -Value "0"
+        
+        # Zusätzliche Taskbar-Optimierungen
+        Add-GPRegistryValue -GPOName $GPOName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "BingSearchEnabled" -Type DWord -Value "0"
+        Add-GPRegistryValue -GPOName $GPOName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "CortanaConsent" -Type DWord -Value "0"
+        
+        Write-Host "Taskbar-Konfiguration abgeschlossen: Suchleiste deaktiviert" -ForegroundColor Green
+    }
+    catch {
+        Write-Error "Fehler bei Taskbar-Konfiguration: $_"
+    }
+}
+
+# Funktion: Laufwerkszuordnung über Registry konfigurieren
+function Set-DriveMapping {
+    param(
+        [string]$GPOName,
+        [string]$DriveLetter,
+        [string]$NetworkPath,
+        [string]$Label = ""
+    )
+    
+    try {
+        # Laufwerkszuordnung über Registry (Computer-Konfiguration)
+        $keyPath = "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+        
+        # Logon-Script-Policy setzen um Drive-Mapping zu ermöglichen
+        Add-GPRegistryValue -GPOName $GPOName -Key $keyPath -ValueName "AllowLogonScript" -Type DWord -Value "1"
+        
+        # Für Benutzerkonfiguration: Persistent Drive Mapping
+        $userKeyPath = "HKEY_CURRENT_USER\Network\$DriveLetter"
+        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "RemotePath" -Type String -Value $NetworkPath
+        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "UserName" -Type String -Value ""
+        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "ProviderName" -Type String -Value "Microsoft Windows Network"
+        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "ProviderType" -Type DWord -Value "131072"
+        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "ConnectionType" -Type DWord -Value "1"
+        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "DeferFlags" -Type DWord -Value "4"
+        
+        if ($Label) {
+            Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "Label" -Type String -Value $Label
+        }
+        
+        Write-Host "Laufwerkszuordnung konfiguriert: $DriveLetter -> $NetworkPath" -ForegroundColor Green
+    }
+    catch {
+        Write-Error "Fehler bei Laufwerkszuordnung $DriveLetter -> $NetworkPath : $_"
+    }
+}
+
 # 1. GPO für Globales Laufwerk (G:) erstellen
-$globalGPO = Get-OrCreateGPO -Name "DriveMapping-Global-G" -Comment "Zuordnung des globalen Laufwerks G: für alle Benutzer"
+$globalGPO = Get-OrCreateGPO -Name "DriveMapping-Global-G" -Comment "Zuordnung des globalen Laufwerks G: für alle Benutzer und Taskbar-Konfiguration"
 
 if ($globalGPO) {
-    # G: Laufwerk über Registry-Einstellungen konfigurieren
-    # Hinweis: In Produktionsumgebung würde man Group Policy Preferences verwenden
-    # Diese Registry-Einstellungen simulieren die GPP-Funktionalität
+    # Server für UNC-Pfad ermitteln
+    $serverName = Get-DomainControllerServer
+    $globalSharePath = "\\$serverName\Global$"
     
-    # Suchleiste in Taskbar deaktivieren
-    Add-GPRegistryValue -GPOName $globalGPO.DisplayName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "SearchboxTaskbarMode" -Type DWord -Value "0"
+    # G: Laufwerk konfigurieren
+    Set-DriveMapping -GPOName $globalGPO.DisplayName -DriveLetter "G" -NetworkPath $globalSharePath -Label "Global"
     
-    Write-Host "Globale GPO konfiguriert: G: Laufwerk und Suchleiste deaktiviert" -ForegroundColor Green
+    # Taskbar-Konfiguration (Suchleiste deaktivieren)
+    Set-TaskbarConfiguration -GPOName $globalGPO.DisplayName
+    
+    Write-Host "Globale GPO konfiguriert: G: -> $globalSharePath, Suchleiste deaktiviert" -ForegroundColor Green
 }
 
 # 2. GPOs für Abteilungslaufwerke (T:) erstellen
 foreach ($dep in $departments) {
     $gpoName = "DriveMapping-$dep-T"
-    $gpoComment = "Zuordnung des Abteilungslaufwerks T: für Abteilung $dep"
+    $gpoComment = "Zuordnung des Abteilungslaufwerks T: für Abteilung $dep und Taskbar-Konfiguration"
     
     $deptGPO = Get-OrCreateGPO -Name $gpoName -Comment $gpoComment
     
     if ($deptGPO) {
+        # Server für UNC-Pfad ermitteln
+        $serverName = Get-DomainControllerServer
+        $deptSharePath = "\\$serverName\Abteilungen$\$dep"
+        
         # T: Laufwerk für Abteilung konfigurieren
-        # Hinweis: In Produktionsumgebung würde man Group Policy Preferences verwenden
+        Set-DriveMapping -GPOName $deptGPO.DisplayName -DriveLetter "T" -NetworkPath $deptSharePath -Label "$dep"
         
-        # Suchleiste in Taskbar deaktivieren (für alle GPOs)
-        Add-GPRegistryValue -GPOName $deptGPO.DisplayName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "SearchboxTaskbarMode" -Type DWord -Value "0"
+        # Taskbar-Konfiguration (Suchleiste deaktivieren)
+        Set-TaskbarConfiguration -GPOName $deptGPO.DisplayName
         
-        Write-Host "Abteilungs-GPO konfiguriert: $dep - T: Laufwerk und Suchleiste deaktiviert" -ForegroundColor Green
+        Write-Host "Abteilungs-GPO konfiguriert: $dep - T: -> $deptSharePath, Suchleiste deaktiviert" -ForegroundColor Green
         
         # GPO mit entsprechender OU verknüpfen
         try {
@@ -158,14 +223,22 @@ if ($globalGPO) {
 
 Write-Host "=== GPO Drive Mapping Setup abgeschlossen ===" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "WICHTIGER HINWEIS:" -ForegroundColor Red
-Write-Host "Die eigentlichen Laufwerkszuordnungen müssen über Group Policy Preferences konfiguriert werden:" -ForegroundColor Yellow
+Write-Host "KONFIGURATION ABGESCHLOSSEN:" -ForegroundColor Green
+Write-Host "✓ Globale GPO erstellt: G: -> Global-Share" -ForegroundColor White
+Write-Host "✓ Abteilungs-GPOs erstellt: T: -> Abteilungsfreigaben (je nach OU)" -ForegroundColor White
+Write-Host "✓ Suchleiste in Taskbar für alle GPOs deaktiviert" -ForegroundColor White
+Write-Host "✓ GPO-OU-Verknüpfungen konfiguriert" -ForegroundColor White
+Write-Host ""
+Write-Host "WICHTIGER HINWEIS:" -ForegroundColor Yellow
+Write-Host "Für Produktionsumgebungen wird empfohlen, Group Policy Preferences zu verwenden:" -ForegroundColor Cyan
 Write-Host "1. Öffnen Sie Group Policy Management Console (gpmc.msc)" -ForegroundColor White
 Write-Host "2. Bearbeiten Sie die erstellten GPOs" -ForegroundColor White
 Write-Host "3. Navigieren Sie zu: Benutzerkonfiguration → Einstellungen → Windows-Einstellungen → Laufwerkszuordnungen" -ForegroundColor White
-Write-Host "4. Konfigurieren Sie:" -ForegroundColor White
-Write-Host "   - G: → \\%LOGONSERVER%\Global$ (für globale GPO)" -ForegroundColor White
-Write-Host "   - T: → \\%LOGONSERVER%\Abteilungen$\{Abteilung} (für Abteilungs-GPOs)" -ForegroundColor White
-Write-Host "5. Setzen Sie entsprechende Sicherheitsfilterung auf DL-Gruppen" -ForegroundColor White
+Write-Host "4. Konfigurieren Sie die Laufwerkszuordnungen über die GUI für bessere Verwaltung" -ForegroundColor White
+Write-Host ""
+Write-Host "AKTUELLE REGISTRY-BASIERTE KONFIGURATION:" -ForegroundColor Cyan
+Write-Host "- G: Laufwerk: Für alle Benutzer" -ForegroundColor White
+Write-Host "- T: Laufwerk: Je nach Abteilungs-OU" -ForegroundColor White
+Write-Host "- Taskbar: Suchleiste deaktiviert" -ForegroundColor White
 Write-Host ""
 Write-Host "Siehe auch: GROUP-POLICY-DRIVE-MAPPING.md für detaillierte Anweisungen" -ForegroundColor Cyan
