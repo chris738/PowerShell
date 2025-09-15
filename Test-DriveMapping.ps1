@@ -47,23 +47,17 @@ foreach ($user in $users) {
     
     Write-Host "`nBenutzer: $sam ($($user.Vorname) $($user.Nachname))" -ForegroundColor White
     Write-Host "  H: → $homePath" -ForegroundColor Green
-    Write-Host "  G: → $globalPath" -ForegroundColor Green  
-    Write-Host "  S: → $departmentPath" -ForegroundColor Green
+    Write-Host "  G: → $globalPath (über Group Policy verwalten)" -ForegroundColor Yellow  
+    Write-Host "  S: → $departmentPath (über Group Policy verwalten)" -ForegroundColor Yellow
     
-    # Zeige Logon-Script Inhalt
-    $scriptContent = @"
-@echo off
-net use G: "$globalPath" /persistent:yes >nul 2>&1
-net use S: "$departmentPath" /persistent:yes >nul 2>&1
-"@
-    
-    Write-Host "  Logon-Script: ${sam}_logon.bat" -ForegroundColor Cyan
+    # Logon-Scripts entfernt - Group Policy Preferences verwenden
+    Write-Host "  Logon-Script: Entfernt - Verwende Group Policy Preferences für G: und S: Laufwerke" -ForegroundColor Cyan
 }
 
 Write-Host "`nZusammenfassung:" -ForegroundColor Yellow
 $departments = $users | Select-Object -ExpandProperty Abteilung -Unique
 Write-Host "Abteilungen: $($departments -join ', ')" -ForegroundColor White
 Write-Host "Benutzer gesamt: $($users.Count)" -ForegroundColor White
-Write-Host "Scripts-Verzeichnis: \\$server\Scripts$" -ForegroundColor White
+Write-Host "Laufwerkszuordnungen: H: (Home), G: und S: über Group Policy Preferences verwalten" -ForegroundColor White
 
-Write-Host "`nTest abgeschlossen! Die Laufwerkszuordnungen würden wie oben gezeigt konfiguriert." -ForegroundColor Green
+Write-Host "`nTest abgeschlossen! H: Laufwerk wird automatisch zugeordnet. G: und S: sollten über Group Policy Preferences konfiguriert werden." -ForegroundColor Green

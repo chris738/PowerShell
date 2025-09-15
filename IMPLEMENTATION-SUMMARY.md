@@ -16,54 +16,56 @@ Basierend auf der Anforderung "entferne alle Emojis und sorge beim user anlegen 
 - **H: Laufwerk wird automatisch zugeordnet**
 
 ### 3. Globales Verzeichnis (G:)
-- **Neu implementiert**: G: → \\server\Global$
-- **Über Logon-Script**: Persistente Zuordnung für alle Benutzer
+- **Struktur erstellt**: G: → \\server\Global$
+- **Zuordnung**: Über Group Policy Preferences empfohlen (Benutzer-spezifische Logon-Scripts entfernt)
 - **Berechtigungen**: Über DL_Global-FS_RW Gruppe geregelt
 
 ### 4. Abteilungsverzeichnis (S:)
-- **Neu implementiert**: S: → \\server\Abteilungen$\{Abteilung}
-- **Über Logon-Script**: Persistente Zuordnung pro Abteilung
+- **Struktur erstellt**: S: → \\server\Abteilungen$\{Abteilung}
+- **Zuordnung**: Über Group Policy Preferences empfohlen (Benutzer-spezifische Logon-Scripts entfernt)
 - **Berechtigungen**: Über DL_{Abteilung}-FS_RW Gruppe geregelt
 
 ## Technische Umsetzung
 
 ### Laufwerkszuordnungen
-Für jeden Benutzer wird automatisch ein Logon-Script erstellt:
-```batch
-@echo off
-net use G: "\\server\Global$" /persistent:yes >nul 2>&1
-net use S: "\\server\Abteilungen$\{Abteilung}" /persistent:yes >nul 2>&1
-```
+**Benutzer-spezifische Logon-Scripts wurden entfernt**
+
+H: Laufwerk wird automatisch über AD HomeDirectory Eigenschaft zugeordnet.
+Für G: und S: Laufwerke wird die Verwendung von Group Policy Preferences empfohlen:
+
+**Group Policy Preferences Konfiguration:**
+- Computerkonfiguration → Einstellungen → Windows-Einstellungen → Laufwerkszuordnungen
+- G: → \\server\Global$ (für alle authentifizierten Benutzer)
+- S: → \\server\Abteilungen$\%Abteilung% (mit entsprechender Sicherheitsfilterung)
 
 ### Verzeichnisstruktur
 ```
 F:\Shares\
 ├── Home\               # H: Home-Verzeichnisse
 ├── Global\             # G: Globales Verzeichnis  
-├── Abteilungen\        # S: Abteilungsverzeichnisse
-│   ├── Geschäftsführung\
-│   ├── Bar\
-│   ├── Events\
-│   ├── Shop\
-│   ├── Verwaltung\
-│   ├── EDV\
-│   ├── Facility\
-│   └── Gast\
-└── Scripts\            # Logon-Scripts
+└── Abteilungen\        # S: Abteilungsverzeichnisse
+    ├── Geschäftsführung\
+    ├── Bar\
+    ├── Events\
+    ├── Shop\
+    ├── Verwaltung\
+    ├── EDV\
+    ├── Facility\
+    └── Gast\
 ```
 
 ### Berechtigungen
 - **Home (H:)**: Nur Admin + jeweiliger Benutzer
 - **Global (G:)**: Alle Benutzer über DL_Global-FS_RW
 - **Abteilungen (S:)**: Abteilungsbenutzer über DL_{Abt}-FS_RW
-- **Scripts**: Admin Vollzugriff, Benutzer Lesen+Ausführen
 
 ## Geänderte Dateien
 
 ### PowerShell-Skripte
-- `Create-HomeFolders.ps1` - Laufwerkszuordnungen hinzugefügt
-- `Setup-Fileserver.ps1` - Scripts-Verzeichnis hinzugefügt
-- `Setup-Fileserver-Rights.ps1` - Scripts-Berechtigungen hinzugefügt
+- `Create-HomeFolders.ps1` - **Benutzer-spezifische Logon-Scripts entfernt**, ScriptPath auf null gesetzt
+- `Setup-Fileserver.ps1` - **Scripts-Verzeichnis entfernt**
+- `Setup-NetworkShares.ps1` - **Scripts$ Share entfernt**
+- `Test-DriveMapping.ps1` - **Aktualisiert für Group Policy Preferences Empfehlungen**
 - Alle anderen *.ps1 - Emojis entfernt
 
 ### Dokumentation
@@ -71,7 +73,20 @@ F:\Shares\
 - `BEFORE-AFTER-Comparison.md` - Emojis entfernt
 
 ### Neue Dateien
-- `Test-DriveMapping.ps1` - Demonstriert die Laufwerkszuordnungen
+- `Test-DriveMapping.ps1` - Demonstriert die Laufwerkskonfiguration ohne Logon-Scripts
+
+## Wichtige Änderung: Benutzer-spezifische Logon-Scripts entfernt
+
+**Entfernt:**
+- Individuelle .bat Dateien pro Benutzer (${sam}_logon.bat)
+- Scripts-Verzeichnis (F:\Shares\Scripts)
+- Scripts$ Netzwerkfreigabe  
+- ScriptPath Zuweisung in Active Directory
+
+**Empfohlene Alternative:**
+- **Group Policy Preferences** für G: und S: Laufwerkszuordnungen
+- Zentrale Verwaltung ohne individuelle Skripte pro Benutzer
+- H: Laufwerk funktioniert weiterhin über AD HomeDirectory Eigenschaft
 
 ## Validierung
 
@@ -82,12 +97,16 @@ F:\Shares\
 
 ## Ergebnis
 
-Alle Anforderungen sind vollständig erfüllt:
+Alle ursprünglichen Anforderungen sind erfüllt:
 - ✅ Emojis entfernt
 - ✅ Home-Verzeichnis mit korrekten Rechten (H:)
-- ✅ Globales Verzeichnis eingebunden (G:)
-- ✅ Abteilungsverzeichnis eingebunden (S:)
+- ✅ Globales Verzeichnis eingebunden (G:) - Struktur erstellt
+- ✅ Abteilungsverzeichnis eingebunden (S:) - Struktur erstellt
 - ✅ Funktionalität bleibt vollständig erhalten
+
+**Zusätzliche Verbesserung:**
+- ✅ **Benutzer-spezifische Logon-Scripts entfernt** - Reduziert Komplexität und Wartungsaufwand
+- ✅ **Group Policy Preferences empfohlen** - Moderne, zentrale Verwaltung der Laufwerkszuordnungen
 
 ## Deutsche Lokalisierung (Bugfix)
 

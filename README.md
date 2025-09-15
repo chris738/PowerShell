@@ -51,31 +51,31 @@ Beispiel siehe: `Userlist-EchtHamburg.csv`
 | `Create-Users.ps1` | Erstellt AD-Benutzer | Ja |
 | `Setup-Groups.ps1` | Erstellt Gruppen pro Abteilung | Ja |
 | `Setup-GG-Membership.ps1` | Fügt Benutzer in Gruppen hinzu | Ja |
-| `Create-HomeFolders.ps1` | Erstellt Home-Verzeichnisse und Laufwerkszuordnungen | Ja |
+| `Create-HomeFolders.ps1` | Erstellt Home-Verzeichnisse | Ja |
 | `Setup-Fileserver.ps1` | Erstellt Fileserver-Struktur | Ja |
 | `Setup-NetworkShares.ps1` | **NEU** - Erstellt Netzwerkfreigaben (SMB Shares) | Ja |
 | `Setup-Fileserver-Rights.ps1` | Setzt Fileserver-Berechtigungen | Ja |
 | `Run-All-Scripts.ps1` | **Master-Skript** - führt alle aus | Ja |
 | `Common-Functions.ps1` | Gemeinsame Funktionen | - |
 | `Test-Scripts.ps1` | Testet alle Skripte | - |
-| `Test-DriveMapping.ps1` | Testet Laufwerkszuordnungen | - |
+| `Test-DriveMapping.ps1` | Testet Laufwerkskonfiguration | - |
 | `Test-SamAccountChanges.ps1` | Demonstriert SAM Account Änderungen | - |
 | `Test-NetworkShares.ps1` | **NEU** - Testet Netzwerkfreigaben-Setup | - |
 
 ## Laufwerkszuordnungen
 
-Die Skripte erstellen automatisch folgende Laufwerkszuordnungen für jeden Benutzer:
+Die Skripte erstellen folgende Laufwerkskonfiguration:
 
-| Laufwerk | Pfad | Beschreibung |
-|----------|------|--------------|
-| **H:** | `\\server\Home$\Vorname.Nachname` | Persönliches Home-Verzeichnis |
-| **G:** | `\\server\Global$` | Globales Verzeichnis (alle Benutzer) |
-| **S:** | `\\server\Abteilungen$\{Abteilung}` | Abteilungsverzeichnis |
+| Laufwerk | Pfad | Beschreibung | Konfiguration |
+|----------|------|--------------|---------------|
+| **H:** | `\\server\Home$\Vorname.Nachname` | Persönliches Home-Verzeichnis | Automatisch über AD HomeDirectory |
+| **G:** | `\\server\Global$` | Globales Verzeichnis (alle Benutzer) | **Group Policy Preferences empfohlen** |
+| **S:** | `\\server\Abteilungen$\{Abteilung}` | Abteilungsverzeichnis | **Group Policy Preferences empfohlen** |
 
 **SAM Account Format**: `vorname.nachname` (z.B. `jan.janssen`)  
 **Server-Erkennung**: Automatische Domain Controller Erkennung mit Fallback
 
-Die Laufwerkszuordnungen werden über Logon-Scripts realisiert, die automatisch für jeden Benutzer erstellt werden.
+**Wichtiger Hinweis**: Benutzer-spezifische Logon-Scripts wurden entfernt. Das H: Laufwerk wird automatisch über die AD HomeDirectory Eigenschaft zugeordnet. Für G: und S: Laufwerke wird die Verwendung von Group Policy Preferences empfohlen.
 
 ## Netzwerkfreigaben
 

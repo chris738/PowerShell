@@ -134,6 +134,5 @@ Set-Permissions -path $globalFolder -group $dlGlobal -rights "Modify"
 Ensure-Folder "$base\Home"
 Write-Host "Home-Verzeichnis erstellt, Rechte werden später pro User vergeben."
 
-# Scripts-Verzeichnis für Logon-Scripts
-Ensure-Folder "$base\Scripts"
-Write-Host "Scripts-Verzeichnis für Benutzer-Logon-Scripts erstellt."
+# Scripts-Verzeichnis entfernt - Benutzer-spezifische Logon-Scripts werden nicht mehr verwendet
+# Laufwerkszuordnungen sollten über Group Policy Preferences verwaltet werden

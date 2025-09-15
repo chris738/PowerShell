@@ -165,20 +165,5 @@ Set-Acl -Path $homeFolder -AclObject $acl
 Write-Host "Rechte für Home-Root: nur Admins"
 Write-Host "Benutzerrechte für einzelne Home-Ordner werden separat pro User vergeben."
 
-# --- Scripts ---
-$scriptsFolder = "$base\Scripts"
-Ensure-Folder $scriptsFolder
-
-# Rechte: Admins Vollzugriff, alle Benutzer Lesen+Ausführen
-$acl = Get-Acl $scriptsFolder
-$acl.SetAccessRuleProtection($true, $false)
-$ruleAdmins = New-Object System.Security.AccessControl.FileSystemAccessRule($adminSid,"FullControl","ContainerInherit,ObjectInherit","None","Allow")
-$acl.SetAccessRule($ruleAdmins)
-
-# Authenticated Users: Lesen und Ausführen für Logon-Scripts
-$authenticatedUsers = New-Object System.Security.Principal.SecurityIdentifier "S-1-5-11"
-$ruleUsers = New-Object System.Security.AccessControl.FileSystemAccessRule($authenticatedUsers,"ReadAndExecute","ContainerInherit,ObjectInherit","None","Allow")
-$acl.AddAccessRule($ruleUsers)
-
-Set-Acl -Path $scriptsFolder -AclObject $acl
-Write-Host "Rechte für Scripts-Root: Admins Vollzugriff, Benutzer Lesen+Ausführen"
+# Scripts-Verzeichnis entfernt - Benutzer-spezifische Logon-Scripts werden nicht mehr verwendet
+# Laufwerkszuordnungen sollten über Group Policy Preferences verwaltet werden
