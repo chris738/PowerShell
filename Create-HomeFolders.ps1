@@ -1,7 +1,36 @@
+# Create-HomeFolders.ps1
+# Erstellt Home-Ordner für Benutzer basierend auf CSV-Abteilungen
+# Aufruf: .\Create-HomeFolders.ps1 [pfad-zur-csv-datei]
+
+param(
+    [Parameter(Mandatory=$false)]
+    [string]$CsvFile
+)
+
 Import-Module ActiveDirectory
 
+# Lade gemeinsame Funktionen
+$scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+. (Join-Path $scriptDir "Common-Functions.ps1")
+
+# CSV-Datei bestimmen
+if (-not $CsvFile) {
+    $CsvFile = Get-DefaultCsvPath
+}
+
+# CSV validieren und Abteilungen laden
+if (-not (Test-CsvFile -CsvPath $CsvFile)) {
+    exit 1
+}
+
+$departments = Get-DepartmentsFromCSV -CsvPath $CsvFile
+if ($departments.Count -eq 0) {
+    Write-Error "Keine Abteilungen in der CSV-Datei gefunden!"
+    exit 1
+}
+
 $homeRoot = "F:\Shares\Home"
-$ous = @("IT","Events","Facility","Vorstand","Shop","Verwaltung","Gast")
+$ous = $departments
 $domain = (Get-ADDomain)
 $dcPath = "DC=$($domain.DNSRoot.Replace('.',',DC='))"
 $server = $env:COMPUTERNAME
