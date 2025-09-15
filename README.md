@@ -41,7 +41,7 @@ Beispiel siehe: `Userlist-EchtHamburg.csv`
 .\Run-All-Scripts.ps1 -CsvFile "C:\path\to\users.csv"
 
 # Einzelne Schritte überspringen
-.\Run-All-Scripts.ps1 -SkipUsers -SkipHomeFolders -SkipNetworkShares
+.\Run-All-Scripts.ps1 -SkipUsers -SkipHomeFolders -SkipNetworkShares -SkipGPO -SkipSharePermissions
 ```
 
 ## Skripte
@@ -55,6 +55,8 @@ Beispiel siehe: `Userlist-EchtHamburg.csv`
 | `Setup-Fileserver.ps1` | Erstellt Fileserver-Struktur | Ja |
 | `Setup-NetworkShares.ps1` | **NEU** - Erstellt Netzwerkfreigaben (SMB Shares) | Ja |
 | `Setup-Fileserver-Rights.ps1` | Setzt Fileserver-Berechtigungen | Ja |
+| `Setup-GPO-DriveMapping.ps1` | **NEU** - Erstellt GPOs für Laufwerkszuordnungen | Ja |
+| `Setup-SharePermissions.ps1` | **NEU** - Konfiguriert Share-Berechtigungen | Ja |
 | `Run-All-Scripts.ps1` | **Master-Skript** - führt alle aus | Ja |
 | `Common-Functions.ps1` | Gemeinsame Funktionen | - |
 | `Test-Scripts.ps1` | Testet alle Skripte | - |
@@ -70,12 +72,29 @@ Die Skripte erstellen folgende Laufwerkskonfiguration:
 |----------|------|--------------|---------------|
 | **H:** | `\\server\Home$\Vorname.Nachname` | Persönliches Home-Verzeichnis | Automatisch über AD HomeDirectory |
 | **G:** | `\\server\Global$` | Globales Verzeichnis (alle Benutzer) | **Group Policy Preferences empfohlen** |
-| **S:** | `\\server\Abteilungen$\{Abteilung}` | Abteilungsverzeichnis | **Group Policy Preferences empfohlen** |
+| **T:** | `\\server\Abteilungen$\{Abteilung}` | Abteilungsverzeichnis | **Group Policy Preferences empfohlen** |
 
 **SAM Account Format**: `vorname.nachname` (z.B. `jan.janssen`)  
 **Server-Erkennung**: Automatische Domain Controller Erkennung mit Fallback
 
-**Wichtiger Hinweis**: Benutzer-spezifische Logon-Scripts wurden entfernt. Das H: Laufwerk wird automatisch über die AD HomeDirectory Eigenschaft zugeordnet. Für G: und S: Laufwerke wird die Verwendung von Group Policy Preferences empfohlen.
+**Wichtiger Hinweis**: Benutzer-spezifische Logon-Scripts wurden entfernt. Das H: Laufwerk wird automatisch über die AD HomeDirectory Eigenschaft zugeordnet. Für G: und T: Laufwerke wird die Verwendung von Group Policy Preferences empfohlen.
+
+## Group Policy Laufwerkszuordnung
+
+Das neue `Setup-GPO-DriveMapping.ps1` Skript automatisiert die Erstellung von Group Policy Objekten für Laufwerkszuordnungen:
+
+| Laufwerk | Verwendung | GPO-Scope | Zusätzliche Features |
+|----------|------------|-----------|----------------------|
+| **G:** | Globales Verzeichnis | Domain-weit | Taskbar-Suchleiste deaktiviert |
+| **T:** | Abteilungsverzeichnisse | Pro OU/Abteilung | Taskbar-Suchleiste deaktiviert |
+
+**Das Skript erstellt:**
+- GPO-Grundstruktur mit Registry-Einstellungen
+- Automatische OU-Verknüpfungen
+- Deaktivierung der Windows Taskbar-Suchleiste
+
+**Manuelle Nachbearbeitung erforderlich:**
+Nach der Skript-Ausführung müssen die Drive Mapping Preferences manuell über die Group Policy Management Console konfiguriert werden. Detaillierte Anweisungen finden Sie in `GROUP-POLICY-DRIVE-MAPPING.md`.
 
 ## Netzwerkfreigaben
 
@@ -89,6 +108,20 @@ Das neue `Setup-NetworkShares.ps1` Skript erstellt automatisch folgende SMB-Netz
 | **Scripts$** | `F:\Shares\Scripts` | Logon-Scripts | Authenticated Users (Read) |
 
 **Hinweis**: Dieses Skript funktioniert nur auf Windows Servern mit SMB-Features.
+
+## Share-Berechtigungen
+
+Das neue `Setup-SharePermissions.ps1` Skript konfiguriert automatisch die SMB-Share-Berechtigungen:
+
+| Share | Gruppe | Berechtigung | Zweck |
+|-------|--------|--------------|-------|
+| **Global$** | DL_Global-FS_RW | Full | Vollzugriff für alle Benutzer |
+| **Global$** | DL_Global-FS_R | Read | Lesezugriff für alle Benutzer |
+| **Abteilungen$** | DL_{Abteilung}-FS_RW | Full | Vollzugriff pro Abteilung |
+| **Abteilungen$** | DL_{Abteilung}-FS_R | Read | Lesezugriff pro Abteilung |
+| **Home$** | Authenticated Users | Change | Zugriff auf eigenes Home-Verzeichnis |
+
+**Wichtig**: Diese Berechtigungen arbeiten zusammen mit NTFS-Berechtigungen. Beide Ebenen müssen korrekt konfiguriert sein für funktionierenden Zugriff.
 
 ### Deutsche Lokalisierung
 

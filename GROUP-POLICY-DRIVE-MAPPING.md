@@ -207,3 +207,32 @@ Nach Implementierung der Group Policy Preferences sollten G: und S: Laufwerke au
 | **Skalierbarkeit** | Lineare Zunahme der Dateien | Konstante Komplexität |
 
 Diese moderne Lösung bietet bessere Verwaltbarkeit, höhere Sicherheit und einfachere Wartung.
+
+## Automatisierte GPO-Erstellung
+
+Für die Erstellung der GPOs steht das PowerShell-Skript `Setup-GPO-DriveMapping.ps1` zur Verfügung:
+
+```powershell
+# Alle GPOs erstellen
+.\Setup-GPO-DriveMapping.ps1
+
+# Mit spezifischer CSV-Datei
+.\Setup-GPO-DriveMapping.ps1 -CsvFile "alternative-benutzer.csv"
+
+# Als Teil des Gesamtprozesses
+.\Run-All-Scripts.ps1
+```
+
+**Das Skript erstellt automatisch:**
+- Eine globale GPO für G: Laufwerk (für alle Benutzer)
+- Separate GPOs für T: Laufwerke (pro Abteilung)
+- Registry-Einstellungen zur Deaktivierung der Taskbar-Suchleiste
+- Verknüpfungen mit entsprechenden OUs
+
+**Nach der Skript-Ausführung müssen Sie manuell:**
+1. Group Policy Management Console (gpmc.msc) öffnen
+2. Die erstellten GPOs bearbeiten
+3. Drive Mapping Preferences konfigurieren (siehe Anweisungen oben)
+4. Sicherheitsfilterung auf DL-Gruppen setzen
+
+> **Hinweis:** Die eigentlichen Laufwerkszuordnungen können nicht vollständig über PowerShell konfiguriert werden und erfordern manuelle Konfiguration über Group Policy Preferences.
