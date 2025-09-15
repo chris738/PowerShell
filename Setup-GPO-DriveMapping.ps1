@@ -96,11 +96,11 @@ function Set-TaskbarConfiguration {
     
     try {
         # Suchleiste komplett deaktivieren (Wert 0 = versteckt)
-        Add-GPRegistryValue -GPOName $GPOName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "SearchboxTaskbarMode" -Type DWord -Value "0"
+        Add-GPRegistryValue -GPOName $GPOName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "SearchboxTaskbarMode" -Type DWord -Value 0
         
         # Zusätzliche Taskbar-Optimierungen
-        Add-GPRegistryValue -GPOName $GPOName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "BingSearchEnabled" -Type DWord -Value "0"
-        Add-GPRegistryValue -GPOName $GPOName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "CortanaConsent" -Type DWord -Value "0"
+        Add-GPRegistryValue -GPOName $GPOName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "BingSearchEnabled" -Type DWord -Value 0
+        Add-GPRegistryValue -GPOName $GPOName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "CortanaConsent" -Type DWord -Value 0
         
         Write-Host "Taskbar-Konfiguration abgeschlossen: Suchleiste deaktiviert" -ForegroundColor Green
     }
@@ -123,16 +123,16 @@ function Set-DriveMapping {
         $keyPath = "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System"
         
         # Logon-Script-Policy setzen um Drive-Mapping zu ermöglichen
-        Add-GPRegistryValue -GPOName $GPOName -Key $keyPath -ValueName "AllowLogonScript" -Type DWord -Value "1"
+        Add-GPRegistryValue -GPOName $GPOName -Key $keyPath -ValueName "AllowLogonScript" -Type DWord -Value 1
         
         # Für Benutzerkonfiguration: Persistent Drive Mapping
         $userKeyPath = "HKEY_CURRENT_USER\Network\$DriveLetter"
         Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "RemotePath" -Type String -Value $NetworkPath
         Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "UserName" -Type String -Value ""
         Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "ProviderName" -Type String -Value "Microsoft Windows Network"
-        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "ProviderType" -Type DWord -Value "131072"
-        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "ConnectionType" -Type DWord -Value "1"
-        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "DeferFlags" -Type DWord -Value "4"
+        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "ProviderType" -Type DWord -Value 131072
+        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "ConnectionType" -Type DWord -Value 1
+        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "DeferFlags" -Type DWord -Value 4
         
         if ($Label) {
             Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "Label" -Type String -Value $Label
