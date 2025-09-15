@@ -33,6 +33,24 @@ if ($departments.Count -eq 0) {
 $domain = (Get-ADDomain)
 $dcPath = "DC=$($domain.DNSRoot.Replace('.',',DC='))"
 
+# --- Globale Gruppen für Fileserver ---
+# Diese Gruppen werden auf Domain-Ebene erstellt für bessere Zugänglichkeit aller OUs
+$dlGlobalRW = "DL_Global-FS_RW"
+$dlGlobalR  = "DL_Global-FS_R"
+
+foreach ($grp in @($dlGlobalRW, $dlGlobalR)) {
+    if (-not (Get-ADGroup -Filter {Name -eq $grp} -ErrorAction SilentlyContinue)) {
+        try {
+            New-ADGroup -Name $grp -GroupScope DomainLocal -GroupCategory Security -Path $dcPath -Description "DL Gruppe für Global Fileshare"
+            $cleanMessage = Remove-EmojiFromString -InputString "Global-Gruppe erstellt: $grp auf Domain-Ebene"
+            Write-Host $cleanMessage
+        }
+        catch {
+            Write-ErrorMessage -Message "Fehler beim Erstellen der Global-Gruppe $grp : $_" -Type "Error"
+        }
+    }
+}
+
 foreach ($dep in $departments) {
     $ouPath = "OU=$dep,$dcPath"
 

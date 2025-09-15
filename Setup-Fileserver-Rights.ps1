@@ -32,6 +32,10 @@ if ($departments.Count -eq 0) {
 # Basis-Laufwerk
 $base = "F:\Shares"
 
+# Domain Info
+$domain = (Get-ADDomain)
+$dcPath = "DC=$($domain.DNSRoot.Replace('.',',DC='))"
+
 # "Domain Admins" SID sicher auflösen
 try {
     $adminSid = Get-SafeDomainAdminsIdentity
@@ -113,7 +117,7 @@ foreach ($dep in $departments) {
     foreach ($grp in @($dlGroupRW, $dlGroupR)) {
         if (-not (Get-ADGroup -Filter {Name -eq $grp} -ErrorAction SilentlyContinue)) {
             try {
-                New-ADGroup -Name $grp -GroupScope DomainLocal -GroupCategory Security -Path "OU=$dep,DC=eHH,DC=de" -Description "DL Gruppe für $dep Fileshare"
+                New-ADGroup -Name $grp -GroupScope DomainLocal -GroupCategory Security -Path "OU=$dep,$dcPath" -Description "DL Gruppe für $dep Fileshare"
                 $cleanMessage = Remove-EmojiFromString -InputString "Gruppe erstellt: $grp"
                 Write-Host $cleanMessage
             }
@@ -136,7 +140,8 @@ $dlGlobalR  = "DL_Global-FS_R"
 foreach ($grp in @($dlGlobalRW, $dlGlobalR)) {
     if (-not (Get-ADGroup -Filter {Name -eq $grp} -ErrorAction SilentlyContinue)) {
         try {
-            New-ADGroup -Name $grp -GroupScope DomainLocal -GroupCategory Security -Path "OU=Verwaltung,DC=eHH,DC=de" -Description "DL Gruppe für Global Fileshare"
+            # Global groups werden auf Domain-Ebene erstellt für bessere Zugänglichkeit aller OUs
+            New-ADGroup -Name $grp -GroupScope DomainLocal -GroupCategory Security -Path $dcPath -Description "DL Gruppe für Global Fileshare"
             $cleanMessage = Remove-EmojiFromString -InputString "Gruppe erstellt: $grp"
             Write-Host $cleanMessage
         }
