@@ -90,6 +90,15 @@ Das neue `Setup-NetworkShares.ps1` Skript erstellt automatisch folgende SMB-Netz
 
 **Hinweis**: Dieses Skript funktioniert nur auf Windows Servern mit SMB-Features.
 
+### Deutsche Lokalisierung
+
+Das Skript unterstützt sowohl deutsche als auch englische Windows Server:
+- **Deutsche Server**: Verwendet lokalisierte Kontennamen wie "Jeder" und "Authentifizierte Benutzer"
+- **Englische Server**: Verwendet Standard-Kontennamen wie "Everyone" und "Authenticated Users"
+- **Automatischer Fallback**: Bei Problemen mit der Namensauflösung werden SIDs verwendet
+
+Dies behebt den Fehler "*Zuordnungen von Kontennamen und Sicherheitskennungen wurden nicht durchgeführt*" auf deutschen Windows Servern.
+
 ## Testen
 
 ```powershell
