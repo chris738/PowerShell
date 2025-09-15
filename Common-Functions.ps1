@@ -151,3 +151,118 @@ function Get-SamAccountName {
     
     return "$cleanVorname.$cleanNachname".ToLower()
 }
+
+function Remove-EmojiFromString {
+    <#
+    .SYNOPSIS
+    Entfernt Emojis aus einem String
+    
+    .PARAMETER InputString
+    Der String, aus dem Emojis entfernt werden sollen
+    
+    .RETURNS
+    String ohne Emojis
+    #>
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$InputString
+    )
+    
+    # Häufige Emoji-Zeichen entfernen (einfache Zeichen)
+    $commonEmojis = @('🎉', '✅', '📂', '🔗', '🌍', '➕', '❌', '⚠️', '✨', '🚀', '💡', '📋', '📊', '🎯', '🔧', '⭐', '🏠', '👤', '👥', '💼', '📁', '🗂️', '📄', '📈', '📉', '🔑', '🛡️', '⚙️', '🔄', '▶️', '⏸️', '⏹️', '🔴', '🟡', '🟢', '🔵', '⚪', '⚫')
+    
+    $result = $InputString
+    foreach ($emoji in $commonEmojis) {
+        $result = $result.Replace($emoji, '')
+    }
+    
+    # Entferne auch andere Unicode-Symbole die als Emojis verwendet werden könnten
+    $result = $result -replace '[\u2600-\u26FF]', ''  # Verschiedene Symbole
+    $result = $result -replace '[\u2700-\u27BF]', ''  # Dingbats
+    
+    return $result.Trim()
+}
+
+function Write-ErrorMessage {
+    <#
+    .SYNOPSIS
+    Schreibt formatierte Fehlermeldungen ohne Emojis
+    
+    .PARAMETER Message
+    Die Fehlermeldung
+    
+    .PARAMETER Type
+    Art des Fehlers: NotFound (rot) oder AlreadyExists (gelb)
+    
+    .PARAMETER AdditionalInfo
+    Zusätzliche Informationen (z.B. Benutzername bei bereits vorhandenen Accounts)
+    #>
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Message,
+        
+        [Parameter(Mandatory=$false)]
+        [ValidateSet("NotFound", "AlreadyExists", "Error")]
+        [string]$Type = "Error",
+        
+        [Parameter(Mandatory=$false)]
+        [string]$AdditionalInfo
+    )
+    
+    # Emojis entfernen
+    $cleanMessage = Remove-EmojiFromString -InputString $Message
+    
+    switch ($Type) {
+        "NotFound" {
+            Write-Host $cleanMessage -ForegroundColor Red
+            if ($AdditionalInfo) {
+                Write-Host $AdditionalInfo -ForegroundColor Red
+            }
+        }
+        "AlreadyExists" {
+            Write-Host $cleanMessage -ForegroundColor Yellow
+            if ($AdditionalInfo) {
+                Write-Host "Betroffener Benutzer: $AdditionalInfo" -ForegroundColor Yellow
+            }
+        }
+        "Error" {
+            Write-Host $cleanMessage -ForegroundColor Red
+            if ($AdditionalInfo) {
+                Write-Host $AdditionalInfo -ForegroundColor Red
+            }
+        }
+    }
+}
+
+function Get-SafeDomainAdminsIdentity {
+    <#
+    .SYNOPSIS
+    Ruft die Domain Admins Gruppe sicher ab und gibt eine verwendbare Identität zurück
+    
+    .RETURNS
+    SecurityIdentifier-Objekt für Domain Admins
+    #>
+    try {
+        # Versuche zuerst über den direkten Namen
+        $domainAdmins = Get-ADGroup -Identity "Domain Admins" -ErrorAction SilentlyContinue
+        if ($domainAdmins) {
+            return New-Object System.Security.Principal.SecurityIdentifier $domainAdmins.SID
+        }
+        
+        # Fallback: Suche über Filter
+        $domainAdmins = Get-ADGroup -Filter {Name -eq "Domain Admins"} -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($domainAdmins) {
+            return New-Object System.Security.Principal.SecurityIdentifier $domainAdmins.SID
+        }
+        
+        # Letzter Fallback: Verwende die bekannte SID für Domain Admins
+        $domain = Get-ADDomain
+        $domainSid = $domain.DomainSID
+        $domainAdminsSid = "$domainSid-512"  # Domain Admins haben immer RID 512
+        return New-Object System.Security.Principal.SecurityIdentifier $domainAdminsSid
+    }
+    catch {
+        Write-ErrorMessage -Message "Fehler beim Abrufen der Domain Admins Gruppe: $_" -Type "Error"
+        throw
+    }
+}

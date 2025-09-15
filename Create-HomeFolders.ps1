@@ -37,10 +37,16 @@ $server = Get-DomainControllerServer
 
 Write-Host "Verwende Server für Laufwerkszuordnungen: $server" -ForegroundColor Cyan
 
-# Admin/SYSTEM SIDs
-$domainAdmins = Get-ADGroup "Domain Admins"
-$adminSid = New-Object System.Security.Principal.SecurityIdentifier $domainAdmins.SID
-$systemSid = New-Object System.Security.Principal.SecurityIdentifier "S-1-5-18"
+# Admin/SYSTEM SIDs sicher auflösen
+try {
+    $adminSid = Get-SafeDomainAdminsIdentity
+    $systemSid = New-Object System.Security.Principal.SecurityIdentifier "S-1-5-18"
+    Write-Host "Admin- und System-SIDs erfolgreich aufgelöst"
+}
+catch {
+    Write-ErrorMessage -Message "Kritischer Fehler: Konnte Admin-SIDs nicht auflösen" -Type "Error"
+    exit 1
+}
 
 # Root sicherstellen
 if (-not (Test-Path $homeRoot)) { New-Item -ItemType Directory -Path $homeRoot | Out-Null }
@@ -78,23 +84,24 @@ foreach ($ou in $ous) {
         }
 
         # ACL setzen
-		try {
-			$uSid = New-Object System.Security.Principal.SecurityIdentifier $u.SID
-			$acl = Get-Acl $userFolder
-			$acl.SetAccessRuleProtection($true,$false)
-			$acl.Access | ForEach-Object { $acl.RemoveAccessRule($_) } | Out-Null
+        try {
+            $uSid = New-Object System.Security.Principal.SecurityIdentifier $u.SID
+            $acl = Get-Acl $userFolder
+            $acl.SetAccessRuleProtection($true,$false)
+            $acl.Access | ForEach-Object { $acl.RemoveAccessRule($_) } | Out-Null
 
-			$acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($systemSid,"FullControl","ContainerInherit,ObjectInherit","None","Allow")))
-			$acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($adminSid,"FullControl","ContainerInherit,ObjectInherit","None","Allow")))
-			$acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($uSid,"Modify","ContainerInherit,ObjectInherit","None","Allow")))
+            $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($systemSid,"FullControl","ContainerInherit,ObjectInherit","None","Allow")))
+            $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($adminSid,"FullControl","ContainerInherit,ObjectInherit","None","Allow")))
+            $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($uSid,"Modify","ContainerInherit,ObjectInherit","None","Allow")))
 
-			Set-Acl -Path $userFolder -AclObject $acl
-			Write-Host "NTFS für $folderName gesetzt."
-		}
-		catch {
-			Write-Warning "ACL-Fehler bei ${userFolder}: $_"
-			continue
-		}
+            Set-Acl -Path $userFolder -AclObject $acl
+            $cleanMessage = Remove-EmojiFromString -InputString "NTFS für $folderName gesetzt."
+            Write-Host $cleanMessage
+        }
+        catch {
+            Write-ErrorMessage -Message "ACL-Fehler bei ${userFolder}: $_" -Type "Error"
+            continue
+        }
 
 
         # Home-Laufwerk eintragen
@@ -133,7 +140,8 @@ net use S: "$departmentPath" /persistent:yes >nul 2>&1
             # Script-Pfad im AD-Benutzer setzen
             Set-ADUser $u -ScriptPath $scriptFileName
             
-            Write-Host "$sam: Laufwerkszuordnungen gesetzt - H: ($uncPath), G: ($globalPath), S: ($departmentPath)"
+            $cleanMessage = Remove-EmojiFromString -InputString "$sam: Laufwerkszuordnungen gesetzt - H: ($uncPath), G: ($globalPath), S: ($departmentPath)"
+            Write-Host $cleanMessage
         }
         catch {
             Write-Warning "Konnte Laufwerkszuordnungen für $($u.SamAccountName) nicht setzen: $_"

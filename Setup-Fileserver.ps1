@@ -35,8 +35,15 @@ $base = "F:\Shares"
 # OU für Gruppen
 $ou = "OU=Gruppen,DC=eHH,DC=de"
 
-# Admin-Gruppe
-$admins = "eHH\Domain Admins"
+# Admin-Gruppe mit sicherer Identitätserkennung
+try {
+    $adminIdentity = Get-SafeDomainAdminsIdentity
+    Write-Host "Domain Admins Identität erfolgreich aufgelöst"
+}
+catch {
+    Write-ErrorMessage -Message "Kritischer Fehler: Konnte Domain Admins Identität nicht auflösen" -Type "Error"
+    exit 1
+}
 
 # Funktion: Ordner anlegen
 function Ensure-Folder {
@@ -51,21 +58,35 @@ function Ensure-Folder {
 function Set-Permissions {
     param([string]$path, [string]$group, [string]$rights)
 
-    $acl = Get-Acl $path
-    $acl.SetAccessRuleProtection($true, $false)
+    try {
+        $acl = Get-Acl $path
+        $acl.SetAccessRuleProtection($true, $false)
 
-    # Admins Vollzugriff
-    $ruleAdmins = New-Object System.Security.AccessControl.FileSystemAccessRule($admins,"FullControl","ContainerInherit,ObjectInherit","None","Allow")
-    $acl.SetAccessRule($ruleAdmins)
+        # Admins Vollzugriff mit sicherer SID
+        $ruleAdmins = New-Object System.Security.AccessControl.FileSystemAccessRule($adminIdentity,"FullControl","ContainerInherit,ObjectInherit","None","Allow")
+        $acl.SetAccessRule($ruleAdmins)
 
-    # Gruppe (Domain Local) Berechtigung
-    if ($group -ne "") {
-        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($group,$rights,"ContainerInherit,ObjectInherit","None","Allow")
-        $acl.AddAccessRule($rule)
+        # Gruppe (Domain Local) Berechtigung
+        if ($group -ne "") {
+            # Überprüfen ob Gruppe existiert
+            $adGroup = Get-ADGroup -Filter {Name -eq $group} -ErrorAction SilentlyContinue
+            if (-not $adGroup) {
+                Write-ErrorMessage -Message "Global-Gruppe $group nicht gefunden!" -Type "NotFound"
+                return
+            }
+            
+            $groupSid = New-Object System.Security.Principal.SecurityIdentifier $adGroup.SID
+            $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($groupSid,$rights,"ContainerInherit,ObjectInherit","None","Allow")
+            $acl.AddAccessRule($rule)
+        }
+
+        Set-Acl -Path $path -AclObject $acl
+        $cleanMessage = Remove-EmojiFromString -InputString "Rechte gesetzt: $group → $rights auf $path"
+        Write-Host $cleanMessage
     }
-
-    Set-Acl -Path $path -AclObject $acl
-    Write-Host "Rechte gesetzt: $group → $rights auf $path"
+    catch {
+        Write-ErrorMessage -Message "Fehler beim Setzen der Rechte für $group auf $path : $_" -Type "Error"
+    }
 }
 
 # Struktur aufbauen
@@ -78,8 +99,15 @@ foreach ($dep in $departments) {
 
     # Domain Local Gruppe anlegen (falls fehlt)
     if (-not (Get-ADGroup -Filter {Name -eq $dlGroup} -ErrorAction SilentlyContinue)) {
-        New-ADGroup -Name $dlGroup -GroupScope DomainLocal -Path $ou -GroupCategory Security -Description "Domain Local Gruppe RW für $dep auf Fileserver"
-        Write-Host "Gruppe erstellt: $dlGroup"
+        try {
+            New-ADGroup -Name $dlGroup -GroupScope DomainLocal -Path $ou -GroupCategory Security -Description "Domain Local Gruppe RW für $dep auf Fileserver"
+            $cleanMessage = Remove-EmojiFromString -InputString "Gruppe erstellt: $dlGroup"
+            Write-Host $cleanMessage
+        }
+        catch {
+            Write-ErrorMessage -Message "Fehler beim Erstellen der Gruppe $dlGroup : $_" -Type "Error"
+            continue
+        }
     }
 
     # Rechte setzen
@@ -91,8 +119,14 @@ $globalFolder = "$base\Global"
 Ensure-Folder $globalFolder
 $dlGlobal = "DL_Global-FS_RW"
 if (-not (Get-ADGroup -Filter {Name -eq $dlGlobal} -ErrorAction SilentlyContinue)) {
-    New-ADGroup -Name $dlGlobal -GroupScope DomainLocal -Path $ou -GroupCategory Security -Description "Domain Local Gruppe RW für Global"
-    Write-Host "Gruppe erstellt: $dlGlobal"
+    try {
+        New-ADGroup -Name $dlGlobal -GroupScope DomainLocal -Path $ou -GroupCategory Security -Description "Domain Local Gruppe RW für Global"
+        $cleanMessage = Remove-EmojiFromString -InputString "Gruppe erstellt: $dlGlobal"
+        Write-Host $cleanMessage
+    }
+    catch {
+        Write-ErrorMessage -Message "Fehler beim Erstellen der Gruppe $dlGlobal : $_" -Type "Error"
+    }
 }
 Set-Permissions -path $globalFolder -group $dlGlobal -rights "Modify"
 
