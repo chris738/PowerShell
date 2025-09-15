@@ -99,3 +99,7 @@ Set-Permissions -path $globalFolder -group $dlGlobal -rights "Modify"
 # Home-Verzeichnis
 Ensure-Folder "$base\Home"
 Write-Host "Home-Verzeichnis erstellt, Rechte werden später pro User vergeben."
+
+# Scripts-Verzeichnis für Logon-Scripts
+Ensure-Folder "$base\Scripts"
+Write-Host "Scripts-Verzeichnis für Benutzer-Logon-Scripts erstellt."

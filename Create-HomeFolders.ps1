@@ -101,5 +101,38 @@ foreach ($ou in $ous) {
         catch {
             Write-Warning "Konnte HomeDrive für $($u.SamAccountName) nicht setzen: $_"
         }
+
+        # Zusätzliche Laufwerkszuordnungen über ScriptPath setzen
+        try {
+            # Global-Laufwerk G: und Abteilungs-Laufwerk S: über Logon-Script
+            $globalPath = "\\$server\Global$"
+            $departmentPath = "\\$server\Abteilungen$\$ou"
+            
+            # Logon-Script erstellen für Laufwerkszuordnungen
+            $scriptContent = @"
+@echo off
+net use G: "$globalPath" /persistent:yes >nul 2>&1
+net use S: "$departmentPath" /persistent:yes >nul 2>&1
+"@
+            
+            # Script-Verzeichnis sicherstellen
+            $scriptDir = "F:\Shares\Scripts"
+            if (-not (Test-Path $scriptDir)) {
+                New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
+            }
+            
+            # Benutzer-spezifisches Logon-Script erstellen
+            $scriptFileName = "$($u.SamAccountName)_logon.bat"
+            $scriptFilePath = Join-Path $scriptDir $scriptFileName
+            $scriptContent | Out-File -FilePath $scriptFilePath -Encoding ASCII -Force
+            
+            # Script-Pfad im AD-Benutzer setzen
+            Set-ADUser $u -ScriptPath $scriptFileName
+            
+            Write-Host "$($u.SamAccountName): Laufwerkszuordnungen gesetzt - G: ($globalPath), S: ($departmentPath)"
+        }
+        catch {
+            Write-Warning "Konnte Laufwerkszuordnungen für $($u.SamAccountName) nicht setzen: $_"
+        }
     }
 }

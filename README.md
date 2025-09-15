@@ -51,12 +51,24 @@ Beispiel siehe: `Userlist-EchtHamburg.csv`
 | `Create-Users.ps1` | Erstellt AD-Benutzer | Ja |
 | `Setup-Groups.ps1` | Erstellt Gruppen pro Abteilung | Ja |
 | `Setup-GG-Membership.ps1` | Fügt Benutzer in Gruppen hinzu | Ja |
-| `Create-HomeFolders.ps1` | Erstellt Home-Verzeichnisse | Ja |
+| `Create-HomeFolders.ps1` | Erstellt Home-Verzeichnisse und Laufwerkszuordnungen | Ja |
 | `Setup-Fileserver.ps1` | Erstellt Fileserver-Struktur | Ja |
 | `Setup-Fileserver-Rights.ps1` | Setzt Fileserver-Berechtigungen | Ja |
 | `Run-All-Scripts.ps1` | **Master-Skript** - führt alle aus | Ja |
 | `Common-Functions.ps1` | Gemeinsame Funktionen | - |
 | `Test-Scripts.ps1` | Testet alle Skripte | - |
+
+## Laufwerkszuordnungen
+
+Die Skripte erstellen automatisch folgende Laufwerkszuordnungen für jeden Benutzer:
+
+| Laufwerk | Pfad | Beschreibung |
+|----------|------|--------------|
+| **H:** | `\\server\Home$\Vorname.Nachname` | Persönliches Home-Verzeichnis |
+| **G:** | `\\server\Global$` | Globales Verzeichnis (alle Benutzer) |
+| **S:** | `\\server\Abteilungen$\{Abteilung}` | Abteilungsverzeichnis |
+
+Die Laufwerkszuordnungen werden über Logon-Scripts realisiert, die automatisch für jeden Benutzer erstellt werden.
 
 ## Testen
 

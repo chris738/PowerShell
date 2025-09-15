@@ -1,7 +1,7 @@
 # BEFORE-AFTER-Comparison.md
 # Vergleich: Vorher vs. Nachher
 
-## 🔴 VORHER (Probleme)
+## VORHER (Probleme)
 
 ### Setup-Groups.ps1 - Alt
 ```powershell
@@ -16,13 +16,13 @@ foreach ($dep in $departments) {
 ```
 
 **Probleme:**
-❌ Hardcoded Abteilungen  
-❌ Unterschiedliche Listen in verschiedenen Skripten  
-❌ Manuelle Anpassung für jedes Deployment nötig  
-❌ Inkonsistenz zwischen CSV und Skripten  
-❌ Fehleranfällig bei Änderungen  
+Hardcoded Abteilungen  
+Unterschiedliche Listen in verschiedenen Skripten  
+Manuelle Anpassung für jedes Deployment nötig  
+Inkonsistenz zwischen CSV und Skripten  
+Fehleranfällig bei Änderungen  
 
-## 🟢 NACHHER (Lösung)
+## NACHHER (Lösung)
 
 ### Setup-Groups.ps1 - Neu
 ```powershell
@@ -63,22 +63,22 @@ foreach ($dep in $departments) {
 ```
 
 **Verbesserungen:**
-✅ Automatisches Laden der Abteilungen aus CSV  
-✅ Parametrisiert - flexible CSV-Datei Auswahl  
-✅ Validierung der CSV-Datei  
-✅ Zentrale Funktionsbibliothek  
-✅ Fehlerbehandlung  
-✅ Konsistenz zwischen allen Skripten  
+Automatisches Laden der Abteilungen aus CSV  
+Parametrisiert - flexible CSV-Datei Auswahl  
+Validierung der CSV-Datei  
+Zentrale Funktionsbibliothek  
+Fehlerbehandlung  
+Konsistenz zwischen allen Skripten  
 
-## 📊 Vergleich Abteilungen
+## Vergleich Abteilungen
 
 | Quelle | Abteilungen |
 |--------|-------------|
 | **CSV-Datei (Ist)** | Geschäftsführung, Bar, Events, Shop, Verwaltung, EDV, Facility, Gast |
 | **Alte Skripte (Hardcoded)** | IT, Events, Facility, Gast, Vorstand, Shop, Verwaltung |
-| **Problem** | 🔴 Inkonsistenz! "Geschäftsführung" ≠ "Vorstand", "EDV" ≠ "IT", "Bar" fehlt |
+| **Problem** | Inkonsistenz! "Geschäftsführung" ≠ "Vorstand", "EDV" ≠ "IT", "Bar" fehlt |
 
-## 🚀 Neue Funktionen
+## Neue Funktionen
 
 ### Master-Skript
 ```powershell
@@ -102,9 +102,9 @@ foreach ($dep in $departments) {
 .\Test-Scripts.ps1  # Testet alle Skripte und CSV-Integration
 ```
 
-## 🎯 Endergebnis
+## Endergebnis
 
-**Problem gelöst!** ✅
+**Problem gelöst!**
 - Alle Skripte nutzen jetzt dieselbe CSV-Quelle
 - Keine manuellen Anpassungen mehr nötig
 - Abteilungen werden automatisch erkannt
