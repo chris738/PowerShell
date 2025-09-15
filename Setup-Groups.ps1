@@ -1,7 +1,33 @@
+# Setup-Groups.ps1
+# Erstellt Gruppen basierend auf Abteilungen aus CSV-Datei
+# Aufruf: .\Setup-Groups.ps1 [pfad-zur-csv-datei]
+
+param(
+    [Parameter(Mandatory=$false)]
+    [string]$CsvFile
+)
+
 Import-Module ActiveDirectory
 
-# Abteilungen / OUs
-$departments = @("IT","Events","Facility","Gast","Vorstand","Shop","Verwaltung")
+# Lade gemeinsame Funktionen
+$scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+. (Join-Path $scriptDir "Common-Functions.ps1")
+
+# CSV-Datei bestimmen
+if (-not $CsvFile) {
+    $CsvFile = Get-DefaultCsvPath
+}
+
+# CSV validieren und Abteilungen laden
+if (-not (Test-CsvFile -CsvPath $CsvFile)) {
+    exit 1
+}
+
+$departments = Get-DepartmentsFromCSV -CsvPath $CsvFile
+if ($departments.Count -eq 0) {
+    Write-Error "Keine Abteilungen in der CSV-Datei gefunden!"
+    exit 1
+}
 
 foreach ($dep in $departments) {
     $ouPath = "OU=$dep,DC=eHH,DC=de"
