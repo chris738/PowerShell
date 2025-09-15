@@ -7,8 +7,17 @@ param(
     [string]$CsvFile
 )
 
-Import-Module ActiveDirectory
-Import-Module SmbShare
+# Module importieren (nur auf Windows Server verfügbar)
+try {
+    Import-Module ActiveDirectory -ErrorAction Stop
+    Import-Module SmbShare -ErrorAction Stop
+}
+catch {
+    Write-Warning "Erforderliche Module (ActiveDirectory, SmbShare) nicht verfügbar."
+    Write-Host "Dieses Skript funktioniert nur auf Windows Servern mit Active Directory und SMB-Features." -ForegroundColor Yellow
+    Write-Host "Auf Linux/macOS Testumgebungen wird das Skript übersprungen." -ForegroundColor Yellow
+    exit 0
+}
 
 # Lade gemeinsame Funktionen
 $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
