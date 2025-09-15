@@ -33,7 +33,9 @@ $homeRoot = "F:\Shares\Home"
 $ous = $departments
 $domain = (Get-ADDomain)
 $dcPath = "DC=$($domain.DNSRoot.Replace('.',',DC='))"
-$server = $env:COMPUTERNAME
+$server = Get-DomainControllerServer
+
+Write-Host "Verwende Server für Laufwerkszuordnungen: $server" -ForegroundColor Cyan
 
 # Admin/SYSTEM SIDs
 $domainAdmins = Get-ADGroup "Domain Admins"
@@ -52,7 +54,9 @@ foreach ($ou in $ous) {
         $ln = ($u.Surname   -replace '\s+','').Trim()
         if (-not $fn -or -not $ln) { continue }
 
-        $folderName = "$fn.$ln"
+        # Verwende neue SAM-Namenskonvention
+        $sam = Get-SamAccountName -Vorname $fn -Nachname $ln
+        $folderName = $sam  # Ordnername entspricht SAM: vorname.nachname
         $userFolder = Join-Path $homeRoot $folderName
         $uncPath    = "\\$server\Home$\$folderName"
 
@@ -122,14 +126,14 @@ net use S: "$departmentPath" /persistent:yes >nul 2>&1
             }
             
             # Benutzer-spezifisches Logon-Script erstellen
-            $scriptFileName = "$($u.SamAccountName)_logon.bat"
+            $scriptFileName = "${sam}_logon.bat"
             $scriptFilePath = Join-Path $scriptDir $scriptFileName
             $scriptContent | Out-File -FilePath $scriptFilePath -Encoding ASCII -Force
             
             # Script-Pfad im AD-Benutzer setzen
             Set-ADUser $u -ScriptPath $scriptFileName
             
-            Write-Host "$($u.SamAccountName): Laufwerkszuordnungen gesetzt - G: ($globalPath), S: ($departmentPath)"
+            Write-Host "$sam: Laufwerkszuordnungen gesetzt - H: ($uncPath), G: ($globalPath), S: ($departmentPath)"
         }
         catch {
             Write-Warning "Konnte Laufwerkszuordnungen für $($u.SamAccountName) nicht setzen: $_"

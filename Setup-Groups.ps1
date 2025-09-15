@@ -29,8 +29,12 @@ if ($departments.Count -eq 0) {
     exit 1
 }
 
+# Domain Info
+$domain = (Get-ADDomain)
+$dcPath = "DC=$($domain.DNSRoot.Replace('.',',DC='))"
+
 foreach ($dep in $departments) {
-    $ouPath = "OU=$dep,DC=eHH,DC=de"
+    $ouPath = "OU=$dep,$dcPath"
 
     # Globale Gruppe (Mitarbeiter)
     $ggGroup = "GG_${dep}-MA"

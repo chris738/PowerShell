@@ -24,19 +24,21 @@ if (-not (Test-CsvFile -CsvPath $CsvFile)) {
 Write-Host "Teste Laufwerkszuordnungs-Funktionalität..." -ForegroundColor Cyan
 
 $users = Import-Csv -Path $CsvFile -Delimiter ";"
-$server = "FILESERVER01"  # Beispiel-Servername
+$server = Get-DomainControllerServer
 
+Write-Host "Verwende Server: $server" -ForegroundColor Green
 Write-Host "`nGeplante Laufwerkszuordnungen:" -ForegroundColor Yellow
 
 foreach ($user in $users) {
     $vorname = ($user.Vorname -replace '\s+','').Trim()
     $nachname = ($user.Nachname -replace '\s+','').Trim()
     $abteilung = $user.Abteilung
-    $sam = ($vorname.Substring(0,1) + $nachname).ToLower()
     
     if (-not $vorname -or -not $nachname) { continue }
     
-    $folderName = "$vorname.$nachname"
+    # Neues SAM Format: Vorname.Nachname  
+    $sam = Get-SamAccountName -Vorname $vorname -Nachname $nachname
+    $folderName = $sam  # Ordnername entspricht SAM
     
     # Pfade definieren
     $homePath = "\\$server\Home$\$folderName"
@@ -55,7 +57,7 @@ net use G: "$globalPath" /persistent:yes >nul 2>&1
 net use S: "$departmentPath" /persistent:yes >nul 2>&1
 "@
     
-    Write-Host "  Logon-Script: $sam_logon.bat" -ForegroundColor Cyan
+    Write-Host "  Logon-Script: ${sam}_logon.bat" -ForegroundColor Cyan
 }
 
 Write-Host "`nZusammenfassung:" -ForegroundColor Yellow

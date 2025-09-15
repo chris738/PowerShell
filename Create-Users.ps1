@@ -1,30 +1,51 @@
-# AddUsers.ps1
-# Aufruf: .\AddUsers.ps1 users.csv
+# Create-Users.ps1
+# Erstellt AD-Benutzer basierend auf CSV-Abteilungen mit Vorname.Nachname SAM Format
+# Aufruf: .\Create-Users.ps1 [pfad-zur-csv-datei]
 
 param(
-    [Parameter(Mandatory=$true)]
-    [string]$csvFile
+    [Parameter(Mandatory=$false)]
+    [string]$CsvFile
 )
 
 Import-Module ActiveDirectory
 
-if (-Not (Test-Path $csvFile)) {
-    Write-Host "CSV-Datei $csvFile nicht gefunden!" -ForegroundColor Red
+# Lade gemeinsame Funktionen
+$scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+. (Join-Path $scriptDir "Common-Functions.ps1")
+
+# CSV-Datei bestimmen
+if (-not $CsvFile) {
+    $CsvFile = Get-DefaultCsvPath
+}
+
+# CSV validieren
+if (-not (Test-CsvFile -CsvPath $CsvFile)) {
     exit 1
 }
 
-$users = Import-Csv -Path $csvFile -Delimiter ";"
+$users = Import-Csv -Path $CsvFile -Delimiter ";"
+
+# Domain Info
+$domain = (Get-ADDomain)
+$dcPath = "DC=$($domain.DNSRoot.Replace('.',',DC='))"
 
 foreach ($user in $users) {
-    $vorname   = $user.Vorname
-    $nachname  = $user.Nachname
+    $vorname   = ($user.Vorname -replace '\s+','').Trim()
+    $nachname  = ($user.Nachname -replace '\s+','').Trim()
     $ou        = $user.Abteilung
     $email     = $user.'E-Mail'
-    $sam       = ($vorname.Substring(0,1) + $nachname).ToLower()
-    $display   = "$vorname $nachname"
+    
+    if (-not $vorname -or -not $nachname) {
+        Write-Warning "Vorname oder Nachname fehlt für Benutzer: $($user.Vorname) $($user.Nachname)"
+        continue
+    }
+    
+    # Neues SAM Format: Vorname.Nachname
+    $sam       = Get-SamAccountName -Vorname $vorname -Nachname $nachname
+    $display   = "$($user.Vorname) $($user.Nachname)"
 
-    # OU-Pfad anpassen auf deine Domain
-    $ouPath = "OU=$ou,DC=ehh,DC=de"
+    # OU-Pfad basierend auf Domain
+    $ouPath = "OU=$ou,$dcPath"
 
     # Passwort generieren (oder aus CSV erweitern)
     $pwd = ConvertTo-SecureString "Start123!" -AsPlainText -Force
@@ -32,19 +53,19 @@ foreach ($user in $users) {
     try {
         New-ADUser `
             -Name $display `
-            -GivenName $vorname `
-            -Surname $nachname `
+            -GivenName $user.Vorname `
+            -Surname $user.Nachname `
             -SamAccountName $sam `
-            -UserPrincipalName "$sam@ehh.de" `
+            -UserPrincipalName "$sam@$($domain.DNSRoot)" `
             -EmailAddress $email `
             -Path $ouPath `
             -AccountPassword $pwd `
             -ChangePasswordAtLogon $true `
             -Enabled $true
 
-        Write-Host "Benutzer $display erfolgreich angelegt in $ouPath"
+        Write-Host "Benutzer $display erfolgreich angelegt: $sam in $ouPath" -ForegroundColor Green
     }
     catch {
-        Write-Host "Fehler bei: $_"
+        Write-Host "Fehler bei $display ($sam): $_" -ForegroundColor Red
     }
 }

@@ -57,6 +57,8 @@ Beispiel siehe: `Userlist-EchtHamburg.csv`
 | `Run-All-Scripts.ps1` | **Master-Skript** - führt alle aus | Ja |
 | `Common-Functions.ps1` | Gemeinsame Funktionen | - |
 | `Test-Scripts.ps1` | Testet alle Skripte | - |
+| `Test-DriveMapping.ps1` | Testet Laufwerkszuordnungen | - |
+| `Test-SamAccountChanges.ps1` | Demonstriert SAM Account Änderungen | - |
 
 ## Laufwerkszuordnungen
 
@@ -67,6 +69,9 @@ Die Skripte erstellen automatisch folgende Laufwerkszuordnungen für jeden Benut
 | **H:** | `\\server\Home$\Vorname.Nachname` | Persönliches Home-Verzeichnis |
 | **G:** | `\\server\Global$` | Globales Verzeichnis (alle Benutzer) |
 | **S:** | `\\server\Abteilungen$\{Abteilung}` | Abteilungsverzeichnis |
+
+**SAM Account Format**: `vorname.nachname` (z.B. `jan.janssen`)  
+**Server-Erkennung**: Automatische Domain Controller Erkennung mit Fallback
 
 Die Laufwerkszuordnungen werden über Logon-Scripts realisiert, die automatisch für jeden Benutzer erstellt werden.
 
