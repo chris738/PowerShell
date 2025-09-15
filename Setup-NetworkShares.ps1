@@ -52,6 +52,64 @@ catch {
     exit 1
 }
 
+# Hilfsfunktion: Überprüft ob ein Konto existiert und aufgelöst werden kann
+function Test-AccountExists {
+    param(
+        [string]$AccountName
+    )
+    
+    if ([string]::IsNullOrWhiteSpace($AccountName)) {
+        return $false
+    }
+    
+    try {
+        # Versuche das Konto über Active Directory zu finden
+        $account = Get-ADObject -Filter "Name -eq '$AccountName' -or SamAccountName -eq '$AccountName'" -ErrorAction SilentlyContinue
+        if ($account) {
+            return $true
+        }
+        
+        # Fallback: Versuche über Windows Security Principal zu resolven
+        $sid = [System.Security.Principal.SecurityIdentifier]::new($AccountName)
+        return $true
+    }
+    catch {
+        # Versuch mit NTAccount
+        try {
+            $ntAccount = [System.Security.Principal.NTAccount]::new($AccountName)
+            $sid = $ntAccount.Translate([System.Security.Principal.SecurityIdentifier])
+            return $true
+        }
+        catch {
+            return $false
+        }
+    }
+}
+
+# Hilfsfunktion: Setzt Berechtigung sicher mit Validierung
+function Grant-SafeSmbShareAccess {
+    param(
+        [string]$ShareName,
+        [string]$AccountName,
+        [string]$AccessRight
+    )
+    
+    if (-not (Test-AccountExists -AccountName $AccountName)) {
+        Write-Host "Warnung: Konto '$AccountName' konnte nicht aufgelöst werden - überspringe Berechtigung" -ForegroundColor Yellow
+        return $false
+    }
+    
+    try {
+        Grant-SmbShareAccess -Name $ShareName -AccountName $AccountName -AccessRight $AccessRight -Force -ErrorAction Stop
+        Write-Host "Berechtigung gesetzt: $AccountName ($AccessRight) für $ShareName" -ForegroundColor Green
+        return $true
+    }
+    catch {
+        Write-Host "Warnung: Konnte Berechtigung für '$AccountName' nicht setzen: $_" -ForegroundColor Yellow
+        return $false
+    }
+}
+
 # Funktion: Netzwerkfreigabe erstellen oder aktualisieren
 function Setup-NetworkShare {
     param(
@@ -87,19 +145,39 @@ function Setup-NetworkShare {
             # Erst Everyone entfernen
             Revoke-SmbShareAccess -Name $ShareName -AccountName "Everyone" -Force -ErrorAction SilentlyContinue
 
-            # Domain Admins immer Vollzugriff
-            Grant-SmbShareAccess -Name $ShareName -AccountName "Domänen-Admins" -AccessRight Full -Force -ErrorAction SilentlyContinue
-            Grant-SmbShareAccess -Name $ShareName -AccountName "Domain Admins" -AccessRight Full -Force -ErrorAction SilentlyContinue
+            # Domain Admins mit sicherer Identitätserkennung
+            try {
+                $adminIdentity = Get-SafeDomainAdminsIdentity
+                $adminSid = $adminIdentity.ToString()
+                
+                # Versuche zuerst deutsche Bezeichnung
+                if (-not (Grant-SafeSmbShareAccess -ShareName $ShareName -AccountName "Domänen-Admins" -AccessRight "Full")) {
+                    # Fallback: englische Bezeichnung
+                    if (-not (Grant-SafeSmbShareAccess -ShareName $ShareName -AccountName "Domain Admins" -AccessRight "Full")) {
+                        # Letzter Fallback: SID verwenden
+                        try {
+                            Grant-SmbShareAccess -Name $ShareName -AccountName $adminSid -AccessRight Full -Force -ErrorAction Stop
+                            Write-Host "Domain Admins Berechtigung über SID gesetzt" -ForegroundColor Green
+                        }
+                        catch {
+                            Write-Host "Warnung: Konnte Domain Admins Berechtigung nicht setzen: $_" -ForegroundColor Yellow
+                        }
+                    }
+                }
+            }
+            catch {
+                Write-Host "Warnung: Domain Admins Identität konnte nicht aufgelöst werden: $_" -ForegroundColor Yellow
+            }
 
-            # Spezifische Berechtigungen
+            # Spezifische Berechtigungen mit Validierung
             foreach ($user in $FullAccessUsers) {
-                Grant-SmbShareAccess -Name $ShareName -AccountName $user -AccessRight Full -Force -ErrorAction SilentlyContinue
+                Grant-SafeSmbShareAccess -ShareName $ShareName -AccountName $user -AccessRight "Full"
             }
             foreach ($user in $ChangeAccessUsers) {
-                Grant-SmbShareAccess -Name $ShareName -AccountName $user -AccessRight Change -Force -ErrorAction SilentlyContinue
+                Grant-SafeSmbShareAccess -ShareName $ShareName -AccountName $user -AccessRight "Change"
             }
             foreach ($user in $ReadAccessUsers) {
-                Grant-SmbShareAccess -Name $ShareName -AccountName $user -AccessRight Read -Force -ErrorAction SilentlyContinue
+                Grant-SafeSmbShareAccess -ShareName $ShareName -AccountName $user -AccessRight "Read"
             }
         }
 
