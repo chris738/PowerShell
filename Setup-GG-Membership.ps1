@@ -33,6 +33,10 @@ if ($departments.Count -eq 0) {
 $domain = (Get-ADDomain)
 $dcPath = "DC=$($domain.DNSRoot.Replace('.',',DC='))"
 
+# Global-Gruppen definieren
+$dlGlobalRW = "DL_Global-FS_RW"
+$dlGlobalR  = "DL_Global-FS_R"
+
 foreach ($dep in $departments) {
     $ouPath = "OU=$dep,$dcPath"
 
@@ -75,6 +79,17 @@ foreach ($dep in $departments) {
             Add-ADGroupMember -Identity $dlR -Members $ggName -ErrorAction Stop
             Write-Host "🔗 $ggName → $dlR"
         } catch { Write-Host "⚠️ $ggName evtl. schon in $dlR" }
+    }
+
+    # *** WICHTIG: Alle GG Gruppen zur Global-Gruppe hinzufügen ***
+    # GG in Global RW aufnehmen (alle Benutzer haben Vollzugriff auf Global)
+    if (Get-ADGroup -Filter {Name -eq $dlGlobalRW} -ErrorAction SilentlyContinue) {
+        try {
+            Add-ADGroupMember -Identity $dlGlobalRW -Members $ggName -ErrorAction Stop
+            Write-Host "🌍 $ggName → $dlGlobalRW (Global Zugriff)"
+        } catch { Write-Host "⚠️ $ggName evtl. schon in $dlGlobalRW" }
+    } else {
+        Write-Host "⚠️ Global-Gruppe $dlGlobalRW nicht gefunden!"
     }
 }
 
