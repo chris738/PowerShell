@@ -140,7 +140,7 @@ net use S: "$departmentPath" /persistent:yes >nul 2>&1
             # Script-Pfad im AD-Benutzer setzen
             Set-ADUser $u -ScriptPath $scriptFileName
             
-            $cleanMessage = Remove-EmojiFromString -InputString "$sam: Laufwerkszuordnungen gesetzt - H: ($uncPath), G: ($globalPath), S: ($departmentPath)"
+            $cleanMessage = Remove-EmojiFromString -InputString "${sam}: Laufwerkszuordnungen gesetzt - H: ($uncPath), G: ($globalPath), S: ($departmentPath)"
             Write-Host $cleanMessage
         }
         catch {
