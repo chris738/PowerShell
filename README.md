@@ -57,6 +57,9 @@ Beispiel siehe: `Userlist-EchtHamburg.csv`
 | `Setup-Fileserver-Rights.ps1` | Setzt Fileserver-Berechtigungen | Ja |
 | `Setup-GPO-DriveMapping.ps1` | **NEU** - Erstellt GPOs für Laufwerkszuordnungen | Ja |
 | `Setup-SharePermissions.ps1` | **NEU** - Konfiguriert Share-Berechtigungen | Ja |
+| `Create-ThreeGPOs-XML.ps1` | **NEUE XML-LÖSUNG** - Erstellt drei GPOs via XML | Ja |
+| `Link-ThreeGPOs-XML.ps1` | **NEUE XML-LÖSUNG** - Verknüpft XML-basierte GPOs | Ja |
+| `Complete-GPO-Setup-XML.ps1` | **NEUE XML-LÖSUNG** - Vollständiges XML-GPO-Setup | Ja |
 | `Run-All-Scripts.ps1` | **Master-Skript** - führt alle aus | Ja |
 | `Common-Functions.ps1` | Gemeinsame Funktionen | - |
 | `Test-Scripts.ps1` | Testet alle Skripte | - |
@@ -144,5 +147,36 @@ Dies behebt den Fehler "*Zuordnungen von Kontennamen und Sicherheitskennungen wu
 Die Skripte erkennen automatisch alle eindeutigen Abteilungen aus der CSV-Datei:
 - **Aktuell erkannt**: Geschäftsführung, Bar, Events, Shop, Verwaltung, EDV, Facility, Gast
 - **Früher fest codiert**: IT, Events, Facility, Vorstand, Shop, Verwaltung, Gast
+
+Diese XML-basierte Lösung bietet eine moderne, skalierbare und wartungsfreundliche Alternative zu traditionellen GPO-Konfigurationsmethoden.
+
+## XML-basierte GPO-Erstellung (NEUE LÖSUNG)
+
+Für eine moderne, XML-basierte GPO-Verwaltung stehen drei neue Skripte zur Verfügung:
+
+### Grundlegende Verwendung
+```powershell
+# Erstellt drei GPOs via XML (Global G:, Abteilungs-T:, Suchleiste deaktiviert)
+.\Create-ThreeGPOs-XML.ps1 -GlobalSharePath "\\server\Global$"
+
+# Verknüpft die GPOs automatisch mit den entsprechenden OUs
+.\Link-ThreeGPOs-XML.ps1
+
+# Vollständiges Setup in einem Durchgang
+.\Complete-GPO-Setup-XML.ps1 -GlobalSharePath "\\server\Global$"
+
+# Test-Modus (WhatIf) - zeigt Änderungen an ohne sie durchzuführen
+.\Create-ThreeGPOs-XML.ps1 -GlobalSharePath "\\server\Global$" -WhatIf
+```
+
+### Eigenschaften der XML-Lösung
+- **Drei separate GPOs:** `XML_Global_G_Drive`, `XML_Department_T_Drive`, `XML_Disable_Search_Bar`
+- **Group Policy Preferences:** Standard-XML-Format für optimale Kompatibilität
+- **Item-Level-Targeting:** Gruppenbasierte Laufwerkszuordnung für Abteilungen
+- **Automatische SYSVOL-Integration:** XML-Dateien werden korrekt platziert
+- **CSV-gesteuert:** Nutzt die gleiche CSV-Datei wie bestehende Skripte
+
+### Detaillierte Dokumentation
+Siehe `XML-GPO-CREATION-GUIDE.md` für umfassende Anweisungen, Beispiele und Troubleshooting.
 
 Keine manuellen Anpassungen der Skripte mehr nötig!
