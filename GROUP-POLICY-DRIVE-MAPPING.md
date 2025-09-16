@@ -1,5 +1,19 @@
 # Group Policy Preferences für Laufwerkszuordnungen
 
+## 🚀 NEUE VERSION 2.0 - VERBESSERTE IMPLEMENTIERUNG
+
+**WICHTIGE VERBESSERUNG:** Das `Setup-GPO-DriveMapping.ps1` Skript wurde vollständig überarbeitet und kombiniert jetzt die bewährten Ansätze von `create_gpos.ps1` und `link_gpos.ps1` für eine optimale GPO-Verwaltung.
+
+### ✨ Was ist neu in Version 2.0:
+- **Drei separate GPOs** statt einer GPO pro Abteilung
+- **XML-basierte Drive Mappings** (Group Policy Preferences Standard)
+- **Automatische GPO-Verknüpfung** mit intelligenter OU-Erkennung
+- **Item-Level-Targeting** für gruppenbasierte Laufwerkszuordnungen
+- **Modulare Architektur** basierend auf bewährten Skripten
+- **Erweiterte Fehlerbehandlung** und detaillierte Statusberichte
+
+---
+
 ## Übersicht
 
 Diese Anleitung ersetzt die benutzer-spezifischen Logon-Scripts für G: und S: Laufwerkszuordnungen durch Group Policy Preferences - eine moderne, zentrale Verwaltungslösung.
@@ -208,31 +222,65 @@ Nach Implementierung der Group Policy Preferences sollten G: und S: Laufwerke au
 
 Diese moderne Lösung bietet bessere Verwaltbarkeit, höhere Sicherheit und einfachere Wartung.
 
-## Automatisierte GPO-Erstellung
+## Automatisierte GPO-Erstellung (VERBESSERT)
 
-Für die Erstellung der GPOs steht das PowerShell-Skript `Setup-GPO-DriveMapping.ps1` zur Verfügung:
+Für die Erstellung der GPOs steht das **verbesserte** PowerShell-Skript `Setup-GPO-DriveMapping.ps1` zur Verfügung, das nun die modularen Ansätze von `create_gpos.ps1` und `link_gpos.ps1` kombiniert:
 
 ```powershell
-# Alle GPOs erstellen
+# Alle GPOs erstellen und verknüpfen (neue verbesserte Version)
 .\Setup-GPO-DriveMapping.ps1
 
 # Mit spezifischer CSV-Datei
 .\Setup-GPO-DriveMapping.ps1 -CsvFile "alternative-benutzer.csv"
 
+# Mit benutzerdefinierten GPO-Namen
+.\Setup-GPO-DriveMapping.ps1 -GlobalGpoName "Custom_G_Drive" -DepartmentGpoName "Custom_T_Drive" -SearchGpoName "Custom_Search_Disable"
+
 # Als Teil des Gesamtprozesses
 .\Run-All-Scripts.ps1
 ```
 
-**Das Skript erstellt automatisch:**
-- Eine globale GPO für G: Laufwerk (für alle Benutzer)
-- Separate GPOs für T: Laufwerke (pro Abteilung)
-- Registry-Einstellungen zur Deaktivierung der Taskbar-Suchleiste
-- Verknüpfungen mit entsprechenden OUs
+### NEUE FUNKTIONEN (Version 2.0):
 
-**Nach der Skript-Ausführung müssen Sie manuell:**
+**Das verbesserte Skript erstellt automatisch:**
+- ✅ **Drei separate GPOs** (statt einer kombinierten)
+  - Globales G: Laufwerk GPO (`Map_G_Drive`)
+  - Abteilungs-T: Laufwerk GPO (`Map_T_Drive`) mit Item-Level-Targeting
+  - Taskbar-Suchleiste GPO (`Disable_Search_Bar`)
+- ✅ **XML-basierte Drive Mappings** (Group Policy Preferences Standard)
+- ✅ **Item-Level-Targeting** für abteilungsspezifische Laufwerke
+- ✅ **Automatische GPO-Verknüpfungen** mit entsprechenden OUs
+- ✅ **Erweiterte Fehlerbehandlung** und Statusberichte
+- ✅ **CSV-gesteuerte Abteilungserkennung**
+
+### TECHNISCHE VERBESSERUNGEN:
+
+| Bereich | Vorher | Nachher (Version 2.0) |
+|---------|---------|----------------------|
+| **GPO-Struktur** | Eine GPO pro Abteilung | Drei zentrale GPOs |
+| **Drive Mapping** | Registry-basiert | XML-basierte Preferences |
+| **Targeting** | OU-basiert | Gruppenbasiert (Item-Level) |
+| **Verknüpfung** | Manuell pro OU | Automatisch optimiert |
+| **Verwaltung** | Multiple GPOs | Drei konfigurierbare GPOs |
+| **Skalierbarkeit** | Linear wachsend | Konstant (3 GPOs) |
+
+### MODULARE ARCHITEKTUR:
+
+Das neue Skript basiert auf den bewährten Modulen:
+- **`create_gpos.ps1`**: XML-Erstellung und GPO-Management
+- **`link_gpos.ps1`**: Automatisierte GPO-Verknüpfung
+- **`Common-Functions.ps1`**: CSV-Integration und Hilfsfunktionen
+
+**Nach der Skript-Ausführung (Version 2.0):**
+1. ✅ **Drei GPOs automatisch erstellt und verknüpft**
+2. ✅ **XML-basierte Drive Mappings konfiguriert**
+3. ✅ **Item-Level-Targeting für Abteilungsgruppen**
+4. ✅ **Suchleiste-Registry komplett konfiguriert**
+
+**Optionale manuelle Anpassungen:**
 1. Group Policy Management Console (gpmc.msc) öffnen
-2. Die erstellten GPOs bearbeiten
-3. Drive Mapping Preferences konfigurieren (siehe Anweisungen oben)
-4. Sicherheitsfilterung auf DL-Gruppen setzen
+2. Sicherheitsfilterung für Department-GPO verfeinern
+3. Zusätzliche Drive Mapping Preferences hinzufügen
+4. WMI-Filter für erweiterte Zielgruppenadressierung
 
-> **Hinweis:** Die eigentlichen Laufwerkszuordnungen können nicht vollständig über PowerShell konfiguriert werden und erfordern manuelle Konfiguration über Group Policy Preferences.
+> **Hinweis:** Die neue Version 2.0 bietet eine vollständig automatisierte Lösung, die nur minimale manuelle Nachbearbeitung erfordert.

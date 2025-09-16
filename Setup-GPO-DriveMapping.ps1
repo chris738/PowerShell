@@ -1,11 +1,26 @@
 # Setup-GPO-DriveMapping.ps1
-# Erstellt GPOs für Laufwerkszuordnungen (T: für Abteilungen, G: für Global) und deaktiviert Suchleiste
-# UPDATED: Erweiterte Implementierung mit verbesserter Drive-Mapping-Funktionalität
+# Erstellt und verknüpft drei GPOs für Laufwerkszuordnungen basierend auf create_gpos.ps1 und link_gpos.ps1
+# VERBESSERT: Kombiniert die modularen Ansätze für optimale GPO-Verwaltung
+# 
+# Erstellt folgende GPOs:
+# 1. Globales G: Laufwerk für alle Benutzer
+# 2. Abteilungs-T: Laufwerk mit Item-Level-Targeting
+# 3. Taskbar-Suchleiste deaktivieren
+#
 # Aufruf: .\Setup-GPO-DriveMapping.ps1 [pfad-zur-csv-datei]
 
 param(
     [Parameter(Mandatory=$false)]
-    [string]$CsvFile
+    [string]$CsvFile,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$GlobalGpoName = 'Map_G_Drive',
+    
+    [Parameter(Mandatory=$false)]
+    [string]$DepartmentGpoName = 'Map_T_Drive',
+    
+    [Parameter(Mandatory=$false)]
+    [string]$SearchGpoName = 'Disable_Search_Bar'
 )
 
 # Module importieren
@@ -40,14 +55,100 @@ if ($departments.Count -eq 0) {
     exit 1
 }
 
-Write-Host "Erstelle GPOs für Laufwerkszuordnungen..." -ForegroundColor Cyan
+Write-Host "=== Erstelle drei GPOs für erweiterte Laufwerkszuordnungen ===" -ForegroundColor Cyan
+Write-Host "Basierend auf den modularen Skripten create_gpos.ps1 und link_gpos.ps1" -ForegroundColor Gray
+Write-Host ""
 
 # Domain Info
 $domain = (Get-ADDomain)
 $dcPath = "DC=$($domain.DNSRoot.Replace('.',',DC='))"
+$serverName = Get-DomainControllerServer
 
-# Funktion: GPO erstellen oder abrufen
+# ===== HILFSFUNKTIONEN FÜR XML-BASIERTE DRIVE MAPPINGS =====
+# Übernommen und angepasst von create_gpos.ps1
+
+function New-DriveMappingXml {
+    <#
+    .SYNOPSIS
+    Erstellt das Laufwerk-XML für eine einzelne Zuordnung
+    
+    .DESCRIPTION
+    Erzeugt XML-Konfiguration für Group Policy Preferences Drive Mappings
+    mit optionalem Item-Level-Targeting für OU-spezifische Zuordnungen
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$DriveLetter,
+        [Parameter(Mandatory)]
+        [string]$SharePath,
+        [Parameter(Mandatory)]
+        [string]$Label,
+        [Parameter(Mandatory)]
+        [string]$Action,
+        [Parameter()]
+        [string]$OUFilter = $null
+    )
+    
+    $driveNode = @()
+    $uid = [guid]::NewGuid().ToString()
+    $changed = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+    $driveNode += "  <Drive clsid='{935D1B74-9CB8-4e3c-9914-7DD559B7A417}' name='${DriveLetter}:' status='${DriveLetter}:' image='2' changed='$changed' uid='$uid'>"
+    $driveNode += "    <Properties action='$Action' thisDrive='NOCHANGE' allDrives='NOCHANGE' userName='' cpassword='' path='$SharePath' label='$Label' persistent='1' useLetter='1' letter='$DriveLetter' />"
+    if ($OUFilter) {
+        $driveNode += "    <Filters><FilterGroup bool='AND' not='0' name='$Label' sid='' userContext='1' primaryToken='0' localGroup='0'><q:Query xmlns:q='http://www.microsoft.com/GroupPolicy/Settings/Base' clsid='{6AC7EEA7-EE10-4d05-8B80-396A7AA4F820}'><q:GroupMembership name='$OUFilter' sid='' userContext='1' primaryToken='0' localGroup='0'/></q:Query></FilterGroup></Filters>"
+    }
+    $driveNode += "  </Drive>"
+    return ($driveNode -join "`n")
+}
+
+function Save-DriveMappings {
+    <#
+    .SYNOPSIS
+    Speichert die XML-Datei für ein GPO
+    
+    .DESCRIPTION
+    Erstellt die Drives.xml Datei im SYSVOL-Verzeichnis des angegebenen GPOs
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [Guid]$GpoId,
+        [Parameter(Mandatory)]
+        [string[]]$DriveXmlEntries
+    )
+    
+    try {
+        $domain = (Get-ADDomain).DNSRoot
+        $gpoPath = "\\$domain\SYSVOL\$domain\Policies\{$GpoId}\User\Preferences\Drives"
+        
+        # Verzeichnis erstellen falls nicht vorhanden
+        if (-not (Test-Path $gpoPath)) {
+            New-Item -ItemType Directory -Path $gpoPath -Force | Out-Null
+            Write-Host "Erstelle GPO-Verzeichnis: $gpoPath" -ForegroundColor Gray
+        }
+        
+        # XML-Inhalt zusammenbauen
+        $xmlContent = @()
+        $xmlContent += "<?xml version='1.0' encoding='utf-8'?>"
+        $xmlContent += "<Drives clsid='{8FDDCC1A-0C3C-43cd-A6B4-71A6DF20DA8C}'>"
+        $xmlContent += $DriveXmlEntries
+        $xmlContent += "</Drives>"
+        
+        # XML-Datei speichern
+        $xmlFilePath = Join-Path $gpoPath 'Drives.xml'
+        $xmlContent -join "`n" | Out-File -FilePath $xmlFilePath -Encoding utf8
+        Write-Host "Drives.xml erstellt: $xmlFilePath" -ForegroundColor Green
+    }
+    catch {
+        Write-Error "Fehler beim Speichern der Drive Mappings: $_"
+    }
+}
+
+# ===== GPO-VERWALTUNGSFUNKTIONEN =====
 function Get-OrCreateGPO {
+    <#
+    .SYNOPSIS
+    GPO erstellen oder abrufen (erweiterte Version)
+    #>
     param(
         [string]$Name,
         [string]$Comment
@@ -57,9 +158,9 @@ function Get-OrCreateGPO {
         $gpo = Get-GPO -Name $Name -ErrorAction SilentlyContinue
         if (-not $gpo) {
             $gpo = New-GPO -Name $Name -Comment $Comment
-            Write-Host "GPO erstellt: $Name" -ForegroundColor Green
+            Write-Host "✓ GPO erstellt: $Name" -ForegroundColor Green
         } else {
-            Write-Host "GPO bereits vorhanden: $Name" -ForegroundColor Yellow
+            Write-Host "○ GPO bereits vorhanden: $Name" -ForegroundColor Yellow
         }
         return $gpo
     }
@@ -69,181 +170,187 @@ function Get-OrCreateGPO {
     }
 }
 
-# Funktion: Registry-Einstellungen für GPO hinzufügen
-function Add-GPRegistryValue {
+function New-GPOLink {
+    <#
+    .SYNOPSIS
+    Erstellt GPO-Verknüpfung mit Fehlerbehandlung
+    #>
     param(
-        [string]$GPOName,
-        [string]$Key,
-        [string]$ValueName,
-        [string]$Type,
-        $Value
+        [string]$GpoName,
+        [string]$TargetOU,
+        [string]$Description = ""
     )
     
     try {
-        # Für DWord-Typen muss der Wert als String übergeben werden
-        if ($Type -eq "DWord") {
-            $Value = $Value.ToString()
+        # Prüfen ob OU existiert
+        if (-not (Get-ADOrganizationalUnit -Filter {DistinguishedName -eq $TargetOU} -ErrorAction SilentlyContinue)) {
+            Write-Warning "OU nicht gefunden: $TargetOU"
+            return $false
         }
         
-        Set-GPRegistryValue -Name $GPOName -Key $Key -ValueName $ValueName -Type $Type -Value $Value
-        Write-Host "Registry-Einstellung hinzugefügt: $Key\$ValueName = $Value" -ForegroundColor Green
-    }
-    catch {
-        Write-Error "Fehler beim Hinzufügen der Registry-Einstellung: $_"
-    }
-}
-
-# Funktion: Erweiterte Taskbar-Konfiguration
-function Set-TaskbarConfiguration {
-    param(
-        [string]$GPOName
-    )
-    
-    try {
-        # Suchleiste komplett deaktivieren (Wert 0 = versteckt)
-        Add-GPRegistryValue -GPOName $GPOName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "SearchboxTaskbarMode" -Type DWord -Value 0
-        
-        # Zusätzliche Taskbar-Optimierungen
-        Add-GPRegistryValue -GPOName $GPOName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "BingSearchEnabled" -Type DWord -Value 0
-        Add-GPRegistryValue -GPOName $GPOName -Key "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search" -ValueName "CortanaConsent" -Type DWord -Value 0
-        
-        Write-Host "Taskbar-Konfiguration abgeschlossen: Suchleiste deaktiviert" -ForegroundColor Green
-    }
-    catch {
-        Write-Error "Fehler bei Taskbar-Konfiguration: $_"
-    }
-}
-
-# Funktion: Laufwerkszuordnung über Registry konfigurieren
-function Set-DriveMapping {
-    param(
-        [string]$GPOName,
-        [string]$DriveLetter,
-        [string]$NetworkPath,
-        [string]$Label = ""
-    )
-    
-    try {
-        # Laufwerkszuordnung über Registry (Computer-Konfiguration)
-        $keyPath = "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System"
-        
-        # Logon-Script-Policy setzen um Drive-Mapping zu ermöglichen
-        Add-GPRegistryValue -GPOName $GPOName -Key $keyPath -ValueName "AllowLogonScript" -Type DWord -Value 1
-        
-        # Für Benutzerkonfiguration: Persistent Drive Mapping
-        $userKeyPath = "HKEY_CURRENT_USER\Network\$DriveLetter"
-        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "RemotePath" -Type String -Value $NetworkPath
-        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "UserName" -Type String -Value ""
-        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "ProviderName" -Type String -Value "Microsoft Windows Network"
-        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "ProviderType" -Type DWord -Value 131072
-        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "ConnectionType" -Type DWord -Value 1
-        Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "DeferFlags" -Type DWord -Value 4
-        
-        if ($Label) {
-            Add-GPRegistryValue -GPOName $GPOName -Key $userKeyPath -ValueName "Label" -Type String -Value $Label
+        # Prüfen ob Verknüpfung bereits existiert
+        $existingLink = Get-GPInheritance -Target $TargetOU -ErrorAction SilentlyContinue | Where-Object { $_.GpoLinks.DisplayName -eq $GpoName }
+        if ($existingLink) {
+            Write-Host "○ GPO '$GpoName' bereits mit OU verknüpft: $TargetOU" -ForegroundColor Yellow
+            return $true
         }
         
-        Write-Host "Laufwerkszuordnung konfiguriert: $DriveLetter -> $NetworkPath" -ForegroundColor Green
+        # Neue Verknüpfung erstellen
+        New-GPLink -Name $GpoName -Target $TargetOU -Enforced:$false -LinkEnabled:$true -ErrorAction Stop
+        Write-Host "✓ GPO '$GpoName' verknüpft mit: $TargetOU" -ForegroundColor Green
+        if ($Description) {
+            Write-Host "  $Description" -ForegroundColor Gray
+        }
+        return $true
     }
     catch {
-        Write-Error "Fehler bei Laufwerkszuordnung $DriveLetter -> $NetworkPath : $_"
+        Write-Error "Fehler beim Verknüpfen der GPO '$GpoName' mit '$TargetOU': $_"
+        return $false
     }
 }
 
-# 1. GPO für Globales Laufwerk (G:) erstellen
-$globalGPO = Get-OrCreateGPO -Name "DriveMapping-Global-G" -Comment "Zuordnung des globalen Laufwerks G: für alle Benutzer und Taskbar-Konfiguration"
+# ===== HAUPTLOGIK: DREI-GPO-ERSTELLUNG =====
+
+Write-Host "1. Erstelle GPO für globales G: Laufwerk..." -ForegroundColor Cyan
+
+# GPO 1: Globales G: Laufwerk für alle Benutzer
+$globalGPO = Get-OrCreateGPO -Name $GlobalGpoName -Comment "Globales Laufwerk G: für alle Benutzer"
 
 if ($globalGPO) {
-    # Server für UNC-Pfad ermitteln
-    $serverName = Get-DomainControllerServer
     $globalSharePath = "\\$serverName\Global$"
     
-    # G: Laufwerk konfigurieren
-    Set-DriveMapping -GPOName $globalGPO.DisplayName -DriveLetter "G" -NetworkPath $globalSharePath -Label "Global"
+    # XML-basierte Drive Mapping konfigurieren
+    $entriesG = @()
+    $entriesG += New-DriveMappingXml -DriveLetter 'G' -SharePath $globalSharePath -Label 'Global' -Action 'U'
+    Save-DriveMappings -GpoId $globalGPO.Id -DriveXmlEntries $entriesG
     
-    # Taskbar-Konfiguration (Suchleiste deaktivieren)
-    Set-TaskbarConfiguration -GPOName $globalGPO.DisplayName
-    
-    Write-Host "Globale GPO konfiguriert: G: -> $globalSharePath, Suchleiste deaktiviert" -ForegroundColor Green
+    Write-Host "   G: -> $globalSharePath" -ForegroundColor White
 }
 
-# 2. GPOs für Abteilungslaufwerke (T:) erstellen
-foreach ($dep in $departments) {
-    $gpoName = "DriveMapping-$dep-T"
-    $gpoComment = "Zuordnung des Abteilungslaufwerks T: für Abteilung $dep und Taskbar-Konfiguration"
-    
-    $deptGPO = Get-OrCreateGPO -Name $gpoName -Comment $gpoComment
-    
-    if ($deptGPO) {
-        # Server für UNC-Pfad ermitteln
-        $serverName = Get-DomainControllerServer
-        $deptSharePath = "\\$serverName\Abteilungen$\$dep"
-        
-        # T: Laufwerk für Abteilung konfigurieren
-        Set-DriveMapping -GPOName $deptGPO.DisplayName -DriveLetter "T" -NetworkPath $deptSharePath -Label "$dep"
-        
-        # Taskbar-Konfiguration (Suchleiste deaktivieren)
-        Set-TaskbarConfiguration -GPOName $deptGPO.DisplayName
-        
-        Write-Host "Abteilungs-GPO konfiguriert: $dep - T: -> $deptSharePath, Suchleiste deaktiviert" -ForegroundColor Green
-        
-        # GPO mit entsprechender OU verknüpfen
-        try {
-            $ouPath = "OU=$dep,$dcPath"
-            if (Get-ADOrganizationalUnit -Filter {DistinguishedName -eq $ouPath} -ErrorAction SilentlyContinue) {
-                # Prüfen, ob Verknüpfung bereits existiert
-                $existingLink = Get-GPInheritance -Target $ouPath | Where-Object { $_.GpoLinks.DisplayName -eq $deptGPO.DisplayName }
-                if (-not $existingLink) {
-                    New-GPLink -Name $deptGPO.DisplayName -Target $ouPath -LinkEnabled Yes
-                    Write-Host "GPO '$($deptGPO.DisplayName)' mit OU '$dep' verknüpft" -ForegroundColor Green
-                } else {
-                    Write-Host "GPO '$($deptGPO.DisplayName)' bereits mit OU '$dep' verknüpft" -ForegroundColor Yellow
-                }
-            } else {
-                Write-Warning "OU '$dep' nicht gefunden. GPO wurde erstellt, aber nicht verknüpft."
-            }
-        }
-        catch {
-            Write-Error "Fehler beim Verknüpfen der GPO mit OU '$dep': $_"
-        }
+Write-Host ""
+Write-Host "2. Erstelle GPO für Abteilungs-T: Laufwerke..." -ForegroundColor Cyan
+
+# GPO 2: Abteilungslaufwerk T: mit Item-Level-Targeting
+$deptGPO = Get-OrCreateGPO -Name $DepartmentGpoName -Comment "Abteilungslaufwerk T: für jede OU mit Item-Level-Targeting"
+
+if ($deptGPO) {
+    # Hashtable für Abteilungspfade erstellen
+    $departmentSharePaths = @{}
+    foreach ($dep in $departments) {
+        $ouDN = "OU=$dep,$dcPath"
+        $sharePath = "\\$serverName\Abteilungen$\$dep"
+        $departmentSharePaths[$ouDN] = $sharePath
     }
+    
+    # XML-Einträge für T: Laufwerk mit Item-Level-Targeting
+    $entriesT = @()
+    foreach ($ouDN in $departmentSharePaths.Keys) {
+        $sharePath = $departmentSharePaths[$ouDN]
+        $ouName = ($ouDN -split ',')[0] -replace '^OU='
+        
+        # Item-Level-Targeting: Gruppe als Filter verwenden
+        $groupFilter = "DL_$ouName-FS_RW"
+        $entriesT += New-DriveMappingXml -DriveLetter 'T' -SharePath $sharePath -Label $ouName -Action 'U' -OUFilter $groupFilter
+        Write-Host "   T: -> $sharePath (für Gruppe $groupFilter)" -ForegroundColor White
+    }
+    Save-DriveMappings -GpoId $deptGPO.Id -DriveXmlEntries $entriesT
 }
 
-# 3. Globale GPO mit Domain verknüpfen
-if ($globalGPO) {
+Write-Host ""
+Write-Host "3. Erstelle GPO für Taskbar-Suchleiste..." -ForegroundColor Cyan
+
+# GPO 3: Taskbar-Suchleiste deaktivieren
+$searchGPO = Get-OrCreateGPO -Name $SearchGpoName -Comment "Deaktiviert die Windows-Taskleisten-Suche"
+
+if ($searchGPO) {
+    # Registry-Einträge für Suchleiste
     try {
-        # Prüfen, ob Verknüpfung bereits existiert
-        $existingLink = Get-GPInheritance -Target $dcPath | Where-Object { $_.GpoLinks.DisplayName -eq $globalGPO.DisplayName }
-        if (-not $existingLink) {
-            New-GPLink -Name $globalGPO.DisplayName -Target $dcPath -LinkEnabled Yes
-            Write-Host "Globale GPO '$($globalGPO.DisplayName)' mit Domain verknüpft" -ForegroundColor Green
-        } else {
-            Write-Host "Globale GPO '$($globalGPO.DisplayName)' bereits mit Domain verknüpft" -ForegroundColor Yellow
-        }
+        Set-GPRegistryValue -Name $SearchGpoName -Key 'HKCU\Software\Microsoft\Windows\CurrentVersion\Search' -ValueName 'SearchBoxTaskbarMode' -Type DWord -Value 0 -ErrorAction Stop
+        Set-GPRegistryValue -Name $SearchGpoName -Key 'HKCU\Software\Microsoft\Windows\CurrentVersion\Search' -ValueName 'BingSearchEnabled' -Type DWord -Value 0 -ErrorAction Stop
+        Set-GPRegistryValue -Name $SearchGpoName -Key 'HKCU\Software\Microsoft\Windows\CurrentVersion\Search' -ValueName 'CortanaConsent' -Type DWord -Value 0 -ErrorAction Stop
+        Write-Host "   Suchleiste komplett deaktiviert (SearchBoxTaskbarMode=0)" -ForegroundColor White
     }
     catch {
-        Write-Error "Fehler beim Verknüpfen der globalen GPO mit Domain: $_"
+        Write-Error "Fehler bei Suchleisten-Konfiguration: $_"
     }
 }
 
-Write-Host "=== GPO Drive Mapping Setup abgeschlossen ===" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "KONFIGURATION ABGESCHLOSSEN:" -ForegroundColor Green
-Write-Host "✓ Globale GPO erstellt: G: -> Global-Share" -ForegroundColor White
-Write-Host "✓ Abteilungs-GPOs erstellt: T: -> Abteilungsfreigaben (je nach OU)" -ForegroundColor White
-Write-Host "✓ Suchleiste in Taskbar für alle GPOs deaktiviert" -ForegroundColor White
-Write-Host "✓ GPO-OU-Verknüpfungen konfiguriert" -ForegroundColor White
+Write-Host "=== VERKNÜPFUNG DER GPOs MIT OUs ===" -ForegroundColor Cyan
+
+# Verknüpfungen erstellen (basierend auf link_gpos.ps1 Logik)
+$linkResults = @()
+
+# 1. Globales GPO mit Domain verknüpfen
+if ($globalGPO) {
+    Write-Host "Verknüpfe globales GPO mit Domain..." -ForegroundColor Yellow
+    $result = New-GPOLink -GpoName $globalGPO.DisplayName -TargetOU $dcPath -Description "Für alle Benutzer in der Domain"
+    $linkResults += @{GPO = $globalGPO.DisplayName; Target = "Domain"; Success = $result}
+}
+
+# 2. Abteilungs-GPO mit jeder OU verknüpfen
+if ($deptGPO) {
+    Write-Host "Verknüpfe Abteilungs-GPO mit OUs..." -ForegroundColor Yellow
+    foreach ($dep in $departments) {
+        $ouPath = "OU=$dep,$dcPath"
+        $result = New-GPOLink -GpoName $deptGPO.DisplayName -TargetOU $ouPath -Description "Item-Level-Targeting für Abteilung $dep"
+        $linkResults += @{GPO = $deptGPO.DisplayName; Target = $dep; Success = $result}
+    }
+}
+
+# 3. Suchleisten-GPO mit allen OUs verknüpfen
+if ($searchGPO) {
+    Write-Host "Verknüpfe Suchleisten-GPO..." -ForegroundColor Yellow
+    
+    # Mit Domain verknüpfen für alle Benutzer
+    $result = New-GPOLink -GpoName $searchGPO.DisplayName -TargetOU $dcPath -Description "Suchleiste für alle Benutzer deaktivieren"
+    $linkResults += @{GPO = $searchGPO.DisplayName; Target = "Domain"; Success = $result}
+}
+
 Write-Host ""
-Write-Host "WICHTIGER HINWEIS:" -ForegroundColor Yellow
-Write-Host "Für Produktionsumgebungen wird empfohlen, Group Policy Preferences zu verwenden:" -ForegroundColor Cyan
-Write-Host "1. Öffnen Sie Group Policy Management Console (gpmc.msc)" -ForegroundColor White
-Write-Host "2. Bearbeiten Sie die erstellten GPOs" -ForegroundColor White
-Write-Host "3. Navigieren Sie zu: Benutzerkonfiguration → Einstellungen → Windows-Einstellungen → Laufwerkszuordnungen" -ForegroundColor White
-Write-Host "4. Konfigurieren Sie die Laufwerkszuordnungen über die GUI für bessere Verwaltung" -ForegroundColor White
+Write-Host "=== ZUSAMMENFASSUNG DER GPO-ERSTELLUNG ===" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "AKTUELLE REGISTRY-BASIERTE KONFIGURATION:" -ForegroundColor Cyan
-Write-Host "- G: Laufwerk: Für alle Benutzer" -ForegroundColor White
-Write-Host "- T: Laufwerk: Je nach Abteilungs-OU" -ForegroundColor White
-Write-Host "- Taskbar: Suchleiste deaktiviert" -ForegroundColor White
+
+# Ergebnisse anzeigen
+$successfulLinks = ($linkResults | Where-Object { $_.Success -eq $true }).Count
+$totalLinks = $linkResults.Count
+
+Write-Host "ERSTELLTE GPOs:" -ForegroundColor Green
+if ($globalGPO) { Write-Host "✓ $($globalGPO.DisplayName) - Globales G: Laufwerk" -ForegroundColor White }
+if ($deptGPO) { Write-Host "✓ $($deptGPO.DisplayName) - Abteilungs-T: Laufwerke (mit Item-Level-Targeting)" -ForegroundColor White }
+if ($searchGPO) { Write-Host "✓ $($searchGPO.DisplayName) - Taskbar-Suchleiste deaktiviert" -ForegroundColor White }
+
 Write-Host ""
-Write-Host "Siehe auch: GROUP-POLICY-DRIVE-MAPPING.md für detaillierte Anweisungen" -ForegroundColor Cyan
+Write-Host "VERKNÜPFUNGEN:" -ForegroundColor Green
+Write-Host "✓ $successfulLinks von $totalLinks Verknüpfungen erfolgreich" -ForegroundColor White
+
+foreach ($result in $linkResults) {
+    $status = if ($result.Success) { "✓" } else { "✗" }
+    $color = if ($result.Success) { "Green" } else { "Red" }
+    Write-Host "$status $($result.GPO) -> $($result.Target)" -ForegroundColor $color
+}
+
+Write-Host ""
+Write-Host "WICHTIGE HINWEISE:" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "VERBESSERTE IMPLEMENTIERUNG:" -ForegroundColor Cyan
+Write-Host "• Basiert auf den modularen Skripten create_gpos.ps1 und link_gpos.ps1" -ForegroundColor White
+Write-Host "• Verwendet XML-basierte Drive Mappings (Group Policy Preferences)" -ForegroundColor White
+Write-Host "• Item-Level-Targeting für abteilungsspezifische T: Laufwerke" -ForegroundColor White
+Write-Host "• Drei separate GPOs für optimale Verwaltung" -ForegroundColor White
+Write-Host ""
+Write-Host "KONFIGURATION:" -ForegroundColor Cyan
+Write-Host "• G: Laufwerk: Für alle Benutzer (über Domain-Verknüpfung)" -ForegroundColor White
+Write-Host "• T: Laufwerk: Je nach Abteilungsgruppe (DL_*-FS_RW)" -ForegroundColor White
+Write-Host "• Suchleiste: Komplett deaktiviert (alle Registry-Werte)" -ForegroundColor White
+Write-Host ""
+Write-Host "NÄCHSTE SCHRITTE:" -ForegroundColor Yellow
+Write-Host "1. Group Policy Management Console (gpmc.msc) öffnen" -ForegroundColor White
+Write-Host "2. Erstellte GPOs überprüfen und bei Bedarf anpassen" -ForegroundColor White
+Write-Host "3. Sicherheitsfilterung für Abteilungs-GPO auf DL-Gruppen setzen" -ForegroundColor White
+Write-Host "4. Group Policy Update auf Clients: gpupdate /force" -ForegroundColor White
+Write-Host ""
+Write-Host "DOKUMENTATION:" -ForegroundColor Cyan
+Write-Host "Siehe GROUP-POLICY-DRIVE-MAPPING.md für detaillierte Anweisungen" -ForegroundColor White
+Write-Host ""
+Write-Host "=== GPO SETUP ABGESCHLOSSEN ===" -ForegroundColor Green
