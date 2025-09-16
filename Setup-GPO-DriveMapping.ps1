@@ -76,10 +76,15 @@ function Add-GPRegistryValue {
         [string]$Key,
         [string]$ValueName,
         [string]$Type,
-        [string]$Value
+        $Value
     )
     
     try {
+        # Für DWord-Typen muss der Wert als String übergeben werden
+        if ($Type -eq "DWord") {
+            $Value = $Value.ToString()
+        }
+        
         Set-GPRegistryValue -Name $GPOName -Key $Key -ValueName $ValueName -Type $Type -Value $Value
         Write-Host "Registry-Einstellung hinzugefügt: $Key\$ValueName = $Value" -ForegroundColor Green
     }
