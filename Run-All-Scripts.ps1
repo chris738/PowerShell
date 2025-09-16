@@ -47,6 +47,10 @@ if (-not (Test-CsvFile -CsvPath $CsvFile)) {
 $departments = Get-DepartmentsFromCSV -CsvPath $CsvFile
 Write-Host "Verarbeite Abteilungen: $($departments -join ', ')" -ForegroundColor Yellow
 
+# Server für GlobalSharePath bestimmen (für XML-GPO Skripte)
+$serverName = Get-DomainControllerServer
+$globalSharePath = "\\$serverName\Global$"
+
 # Skripte in der richtigen Reihenfolge ausführen
 $scripts = @(
     @{Name="Setup-Groups.ps1"; Skip=$SkipGroups; Description="Erstelle Gruppen"},
@@ -56,7 +60,8 @@ $scripts = @(
     @{Name="Setup-NetworkShares.ps1"; Skip=$SkipNetworkShares; Description="Netzwerkfreigaben"},
     @{Name="Setup-Fileserver-Rights.ps1"; Skip=$SkipFileserver; Description="Fileserver-Rechte"},
     @{Name="Create-HomeFolders.ps1"; Skip=$SkipHomeFolders; Description="Home-Ordner"},
-    @{Name="Setup-GPO-DriveMapping.ps1"; Skip=$SkipGPO; Description="GPO Laufwerkszuordnungen"},
+    @{Name="Create-ThreeGPOs-XML.ps1"; Skip=$SkipGPO; Description="XML-basierte GPO Erstellung"},
+    @{Name="Link-ThreeGPOs-XML.ps1"; Skip=$SkipGPO; Description="XML-basierte GPO Verknüpfung"},
     @{Name="Setup-SharePermissions.ps1"; Skip=$SkipSharePermissions; Description="Share-Berechtigungen"}
 )
 
@@ -70,7 +75,13 @@ foreach ($script in $scripts) {
     if (Test-Path $scriptPath) {
         Write-Host "Führe aus: $($script.Description) ($($script.Name))" -ForegroundColor Green
         try {
-            & $scriptPath -CsvFile $CsvFile
+            # Spezielle Parameter für bestimmte Skripte
+            if ($script.Name -eq "Create-ThreeGPOs-XML.ps1") {
+                & $scriptPath -CsvFile $CsvFile -GlobalSharePath $globalSharePath
+            }
+            else {
+                & $scriptPath -CsvFile $CsvFile
+            }
             Write-Host "Abgeschlossen: $($script.Name)" -ForegroundColor Green
         }
         catch {
