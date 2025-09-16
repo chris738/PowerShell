@@ -22,7 +22,7 @@ param(
     [switch]$SkipNetworkShares,
     
     [Parameter(Mandatory=$false)]
-    [switch]$SkipGPO,
+    [switch]$SkipXMLGPO,
     
     [Parameter(Mandatory=$false)]
     [switch]$SkipSharePermissions
@@ -47,6 +47,17 @@ if (-not (Test-CsvFile -CsvPath $CsvFile)) {
 $departments = Get-DepartmentsFromCSV -CsvPath $CsvFile
 Write-Host "Verarbeite Abteilungen: $($departments -join ', ')" -ForegroundColor Yellow
 
+# Global Share Path für XML-GPO Scripts bestimmen
+$globalSharePath = $null
+try {
+    $serverName = Get-DomainControllerServer
+    $globalSharePath = "\\$serverName\Global$"
+    Write-Host "Global Share Path: $globalSharePath" -ForegroundColor Cyan
+}
+catch {
+    Write-Warning "Konnte Global Share Path nicht bestimmen. XML-GPO Scripts werden übersprungen."
+}
+
 # Skripte in der richtigen Reihenfolge ausführen
 $scripts = @(
     @{Name="Setup-Groups.ps1"; Skip=$SkipGroups; Description="Erstelle Gruppen"},
@@ -56,7 +67,8 @@ $scripts = @(
     @{Name="Setup-NetworkShares.ps1"; Skip=$SkipNetworkShares; Description="Netzwerkfreigaben"},
     @{Name="Setup-Fileserver-Rights.ps1"; Skip=$SkipFileserver; Description="Fileserver-Rechte"},
     @{Name="Create-HomeFolders.ps1"; Skip=$SkipHomeFolders; Description="Home-Ordner"},
-    @{Name="Setup-GPO-DriveMapping.ps1"; Skip=$SkipGPO; Description="GPO Laufwerkszuordnungen"},
+    @{Name="Create-ThreeGPOs-XML.ps1"; Skip=$SkipXMLGPO; Description="XML-basierte GPO Erstellung"; RequiresGlobalShare=$true},
+    @{Name="Link-ThreeGPOs-XML.ps1"; Skip=$SkipXMLGPO; Description="XML-basierte GPO Verknüpfung"; RequiresGlobalShare=$false},
     @{Name="Setup-SharePermissions.ps1"; Skip=$SkipSharePermissions; Description="Share-Berechtigungen"}
 )
 
@@ -70,7 +82,17 @@ foreach ($script in $scripts) {
     if (Test-Path $scriptPath) {
         Write-Host "Führe aus: $($script.Description) ($($script.Name))" -ForegroundColor Green
         try {
-            & $scriptPath -CsvFile $CsvFile
+            # Prüfe ob Script GlobalSharePath benötigt
+            if ($script.RequiresGlobalShare -and $globalSharePath) {
+                & $scriptPath -CsvFile $CsvFile -GlobalSharePath $globalSharePath
+            }
+            elseif ($script.RequiresGlobalShare -and -not $globalSharePath) {
+                Write-Host "Überspringe $($script.Name): GlobalSharePath nicht verfügbar" -ForegroundColor Yellow
+                continue
+            }
+            else {
+                & $scriptPath -CsvFile $CsvFile
+            }
             Write-Host "Abgeschlossen: $($script.Name)" -ForegroundColor Green
         }
         catch {
