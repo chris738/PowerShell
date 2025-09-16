@@ -11,7 +11,7 @@ param(
 # Module importieren
 try {
     Import-Module ActiveDirectory -ErrorAction Stop
-    Import-Module GroupPolicy -ErrorAction Stop
+    Import-Module GroupPolicy -SkipEditionCheck -ErrorAction Stop
 }
 catch {
     Write-Warning "Erforderliche Module (ActiveDirectory, GroupPolicy) nicht verfügbar."
