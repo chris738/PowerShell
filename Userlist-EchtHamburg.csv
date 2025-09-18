@@ -1,6 +1,6 @@
 Vorname;Nachname;Abteilung;E-Mail
-Jan;Janssen;Geschäftsführung;jan.janssen@eHH.de
-Uta;Heinrich;Geschäftsführung;uta.heinrich@eHH.de
+Jan;Janssen;Vorstand;jan.janssen@eHH.de
+Uta;Heinrich;Vorstand;uta.heinrich@eHH.de
 Marco;Peters;Bar;marco.peters@eHH.de
 Marion;Wegener;Bar;marion.wegener@eHH.de
 Wiebke;Benndorf;Bar;wiebke.benndorf@eHH.de
@@ -15,8 +15,8 @@ Frank;Elbufer;Shop;frank.elbufer@eHH.de
 Julia;Schneider;Verwaltung;julia.schneider@eHH.de
 Anna;Winkler;Verwaltung;anna.winkler@eHH.de
 Esther;Hansen;Verwaltung;esther.hansen@eHH.de
-Frank;Bittner;EDV;frank.bittner@eHH.de
-Olaf;Albers;EDV;olaf.albers@eHH.de
+Frank;Bittner;IT;frank.bittner@eHH.de
+Olaf;Albers;IT;olaf.albers@eHH.de
 Mark;Born;Facility;mark.born@eHH.de
 Nils;Kraft;Facility;nils.kraft@eHH.de
 Gast1;Nutzer1;Gast;gast_1@eHH.de
@@ -29,3 +29,4 @@ Gast7;Nutzer7;Gast;gast_7@eHH.de
 Gast8;Nutzer8;Gast;gast_8@eHH.de
 Gast9;Nutzer9;Gast;gast_9@eHH.de
 Gast10;Nutzer10;Gast;gast_10@eHH.de
+Jesper;Haak;Vorstand;jesper.haak@eHH.de

@@ -56,7 +56,7 @@ $scripts = @(
     @{Name="Setup-NetworkShares.ps1"; Skip=$SkipNetworkShares; Description="Netzwerkfreigaben"},
     @{Name="Setup-Fileserver-Rights.ps1"; Skip=$SkipFileserver; Description="Fileserver-Rechte"},
     @{Name="Create-HomeFolders.ps1"; Skip=$SkipHomeFolders; Description="Home-Ordner"},
-    @{Name="Setup-GPO-DriveMapping.ps1"; Skip=$SkipGPO; Description="GPO Laufwerkszuordnungen"},
+    @{Name="Run-SetupGPO-PS51.ps1"; Skip=$SkipGPO; Description="GPO Laufwerkszuordnungen"},
     @{Name="Setup-SharePermissions.ps1"; Skip=$SkipSharePermissions; Description="Share-Berechtigungen"}
 )
 
